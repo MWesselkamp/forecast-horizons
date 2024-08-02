@@ -1,0 +1,25 @@
+chaotic:
+
+  observation_params: [1.18, 1, -0.03, 0.41, 0.25, 1.16, 1, -0.13, 0.62, 0.32]
+  initial_params: [1.05, 1.0, 0.39, 0.44]
+
+  processes:
+    stochastic:
+      true_noise: 0.05
+      initial_noise: 0.05
+    deterministic:
+      true_noise: 0.05
+      initial_noise: null
+
+nonchaotic:
+
+  observation_params: [0.18, 1, -0.1, 0.41, 0.25, 0.16, 1, 0.3, 0.32, 0.32]
+  initial_params: [0.087132, 0.865437, 0.34348, 0.315365]
+
+  processes:
+    stochastic:
+      true_noise: 0.05
+      initial_noise: 0.05
+    deterministic:
+      true_noise: 0.05
+      initial_noise: null

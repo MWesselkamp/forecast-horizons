@@ -1,0 +1,16 @@
+auto_mix_prep==0.2.0
+cftime==1.6.4
+CRPS==2.0.4
+matplotlib==3.9.1
+neuralforecast==1.7.4
+numpy==2.0.1
+pandas==2.2.2
+pytorch_lightning==2.3.3
+PyYAML==6.0.1
+scikit_learn==1.5.1
+scipy==1.14.0
+seaborn==0.13.2
+torch==2.4.0
+torchmetrics==1.4.0.post0
+xarray==2024.7.0
+zarr==2.18.2

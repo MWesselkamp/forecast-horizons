@@ -167,3 +167,6 @@ cython_debug/
 /ecland-emulator/zarr-database.ipynb 
 /ecland-emulator/forecast-module.py
 /ecland-emulator/evaluation-module.py
+
+/data
+/plots

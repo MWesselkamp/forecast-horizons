@@ -21,8 +21,8 @@ from torch import tensor
 from torch.utils.data import DataLoader, Dataset
 
 #PATH = '../data'
-## Open up experiment config
-#with open(os.path.join(PATH, "config.yaml")) as stream:
+## Open up experiment configs
+#with open(os.path.join(PATH, "configs.yaml")) as stream:
 #    try:
 #        CONFIG = yaml.safe_load(stream)
 #    except yaml.YAMLError as exc:
@@ -370,7 +370,7 @@ class NonLinRegDataModule(pl.LightningDataModule):
         self.preds = EcDataset(self.config, 
                               start_yr=self.config["validation_start"], 
                               end_yr=self.config["validation_end"],
-        #                      spatial_splits=self.config["spatial_splits"],
+        #                      spatial_splits=self.configs["spatial_splits"],
         )
 
     def train_dataloader(self):
