@@ -1,7 +1,22 @@
 import numpy as np
 import torch
 from models import Ricker_Predation
-from utils import simulate_temperature
+
+def simulate_temperature(timesteps, freq_s=365, add_trend=False, add_noise=False):
+
+    x = np.arange(timesteps)
+    freq = timesteps / freq_s
+    y = np.sin(2 * np.pi * freq * (x / timesteps))
+
+    if add_trend:
+        y = y + np.linspace(0, 0.1, timesteps)
+
+    if add_noise:
+        y = np.random.normal(y, 0.1)
+    y = np.round(y, 4)
+
+    return y
+
 def create_observations(years, observation_params, true_noise, full_dynamics=False):
     """
     Create observations using the Ricker Predation model.

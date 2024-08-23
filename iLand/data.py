@@ -6,8 +6,8 @@ import os
 # Function to read data
 def read_data():
     measurements = pd.read_csv("./data/site_index_dat.csv", sep=",")
-    predictions_h100 = pd.read_csv("data/stadtwald_testing_results_h100.txt", sep="\s+")
-    predictions = pd.read_csv("data/stadtwald_testing_results_SI_time_series.txt", sep=",")
+    predictions_h100 = pd.read_csv("iLand/data/stadtwald_testing_results_h100.txt", sep="\s+")
+    predictions = pd.read_csv("iLand/data/stadtwald_testing_results_SI_time_series.txt", sep="\s+")
     return measurements, predictions_h100, predictions
 
 # Function to inspect data
@@ -52,6 +52,7 @@ def process_measurements(measurements):
     }
 
     measurements = measurements[measurements['BArt'].isin(baumarten_num)]
+    measurements = measurements.copy()
     measurements.loc[:, 'species'] = measurements['BArt'].map(species_map_num_to_char)
     measurements.loc[:, 'species_fullname'] = measurements['BArt'].map(species_map_num_to_fullname)
 
@@ -95,13 +96,16 @@ def create_and_save_plots(predictions_h100, measurements, output_dir="plots"):
     plt.close()
 
 # Main function to run the script
-def main():
+def get_data():
+
     measurements, predictions_h100, predictions = read_data()
     inspect_data(measurements, predictions_h100, predictions)
     predictions_h100 = add_species_fullname(predictions_h100)
     measurements = process_measurements(measurements)
     create_and_save_plots(predictions_h100, measurements)
 
-if __name__ == "__main__":
+    return measurements, predictions_h100, predictions
 
-    main()
+#if __name__ == "__main__":
+#
+#    measurements, predictions_h100, predictions = get_data()

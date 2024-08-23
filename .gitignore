@@ -168,5 +168,9 @@ cython_debug/
 /ecland-emulator/forecast-module.py
 /ecland-emulator/evaluation-module.py
 
-/data
-/plots
+/iLand/data
+/iLand/plots
+
+/ricker/plots
+
+/bin
