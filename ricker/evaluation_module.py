@@ -72,6 +72,7 @@ class EvaluationModule:
         """
 
         PPP_threshold = 1 - 1 / stats.f.ppf(1 - alpha / 2, df1, df2)
+        print("PPP threshold:", PPP_threshold)
         return PPP_threshold
 
     def _ensemble_sample(self, dimension, ensemble_samples):

@@ -31,3 +31,31 @@ def sample_ensemble_member(ensemble):
     ensemble = np.delete(ensemble, index, axis=0)
 
     return control, ensemble, index
+
+
+def compute_autocorrelation(time_series):
+    """
+    Compute the 1-step autocorrelation lag of a time series.
+
+    Parameters:
+    - time_series (numpy array or list): The time series data.
+
+    Returns:
+    - autocorrelation_lag1 (float): The autocorrelation at lag 1.
+    """
+    time_series = np.asarray(time_series)
+    n = len(time_series)
+
+    # Compute mean of the time series
+    mean = np.mean(time_series)
+
+    # Compute the numerator (covariance at lag 1)
+    numerator = np.sum((time_series[1:] - mean) * (time_series[:-1] - mean))
+
+    # Compute the denominator (variance of the time series)
+    denominator = np.sum((time_series - mean) ** 2)
+
+    # Calculate autocorrelation at lag 1
+    autocorrelation_lag1 = numerator / denominator
+
+    return autocorrelation_lag1

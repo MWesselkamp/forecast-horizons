@@ -87,11 +87,11 @@ class RickerPredation(nn.Module):
             y += np.linspace(0, 0.1, timesteps)
 
         if add_noise:
-            y += np.random.normal(0, 0.1, timesteps)
+            y += np.random.normal(0, 0.08, timesteps)
 
         return np.round(y, 4)
 
-    def create_observations(self, years, phase_shift = 0, split_data=True):
+    def create_observations(self, years, forcing = None, phase_shift = 0, split_data=True):
         """
         Create observations.
         """
@@ -100,9 +100,11 @@ class RickerPredation(nn.Module):
 
         train_size = 365 * (years - 1)
 
-        forcing = self.simulate_forcing(timesteps=timesteps,
-                                        phase_shift = phase_shift,
-                                        add_noise=True)
+        if forcing is None:
+            forcing = self.simulate_forcing(timesteps=timesteps,
+                                            phase_shift = phase_shift,
+                                            add_noise=True)
+
         observation_model = self.create_instance(initial_conditions = self.initial_conditions,
                                                  params=self.model_params,
                                                  noise=self.noise)
@@ -111,15 +113,28 @@ class RickerPredation(nn.Module):
         if split_data:
             return self._process_observations(observed_dynamics, forcing, train_size)
         else:
-            return observed_dynamics.detach().numpy(), forcing
+            return torch.tensor(observed_dynamics)
 
     def create_ensemble(self, ensemble_size, years=1, phase_shift= 0):
 
         ensemble = [
             self.create_observations(years=years,
-                                     phase_shift=phase_shift).get('y_test') for i in range(ensemble_size)
+                                     phase_shift=phase_shift).get('y_test') for _ in range(ensemble_size)
                     ]
         ensemble = torch.stack(ensemble)
+
+        return ensemble
+
+    def iterate_ensemble(self, forcing, ensemble_size, years=1, phase_shift= 0):
+
+        self.ensemble = [
+            self.create_observations(years=years,
+                                     forcing = forcing,
+                                     phase_shift=phase_shift,
+                                     split_data=False) for _ in range(ensemble_size)
+                    ]
+
+        ensemble = torch.stack(self.ensemble)
 
         return ensemble
 
