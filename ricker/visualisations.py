@@ -35,7 +35,7 @@ def plot_ppp(species1_PPP, species2_PPP, PPP_threshold):
     plt.figure(figsize=(7, 5))
     plt.plot(species1_PPP, label="Species 1", color="blue")
     plt.plot(species2_PPP, label="Species 2", color="green")
-    plt.hlines(PPP_threshold, xmin=0, xmax=365, color="black", linestyles='--')
+    plt.hlines(PPP_threshold, xmin=0, xmax=len(species1_PPP), color="black", linestyles='--')
 
     plt.xlabel("Time", fontsize=16)
     plt.ylabel("Potential Prognostic Predictability", fontsize=16)
@@ -106,7 +106,7 @@ def plot_combined(species1_PPP, species2_PPP, PPP_threshold, ensemble):
     # Plot PPP for both species in the first subplot
     ax[1].plot(species1_PPP, label="Species 1", color="blue")
     ax[1].plot(species2_PPP, label="Species 2", color="green")
-    ax[1].hlines(PPP_threshold, xmin=0, xmax=365, color="black", linestyles='--')
+    ax[1].hlines(PPP_threshold, xmin=0, xmax=len(species1_PPP), color="black", linestyles='--')
 
     ax[1].set_xlabel("Time", fontsize=16)
     ax[1].set_ylabel("Potential Prognostic Predictability", fontsize=16)
@@ -126,27 +126,28 @@ def plot_combined(species1_PPP, species2_PPP, PPP_threshold, ensemble):
     plt.show()
 
 def plot_horizon_maps(iterated_dynamics_species1, iterated_dynamics_species2):
-    fig, ax = plt.subplots(1, 2, figsize=(9, 9), sharey=True)  # Two subplots side by side, sharing y-axis
+    # Create subplots with equal aspect ratios
+    fig, ax = plt.subplots(1, 2, figsize=(16, 8), sharey=True)  # Two subplots side by side
 
-    # Plot CRPS heatmap for iterated_dynamics_species1
+    # Plot heatmap for iterated_dynamics_species1
     heatmap1 = ax[0].imshow(iterated_dynamics_species1.transpose(),
-                            vmin=0, origin='lower', cmap='OrRd_r')
+                            vmin=0, origin='lower', cmap='OrRd_r', aspect='auto')
     ax[0].set_xlabel('Initial time', fontsize=18)
     ax[0].set_ylabel('Lead time', fontsize=18)
     ax[0].set_title('Species 1', fontsize=18)
 
-    # Plot CRPS heatmap for iterated_dynamics_species2
+    # Plot heatmap for iterated_dynamics_species2
     heatmap2 = ax[1].imshow(iterated_dynamics_species2.transpose(),
-                            vmin=0, origin='lower', cmap='OrRd_r')
+                            vmin=0, origin='lower', cmap='OrRd_r', aspect='auto')
     ax[1].set_xlabel('Initial time', fontsize=18)
     ax[1].set_title('Species 2', fontsize=18)
 
     # Reduce horizontal space between the subplots
-    plt.subplots_adjust(wspace=-0.6)
+    plt.subplots_adjust(wspace=0.1)
 
-    # Share a single colorbar for both subplots
+    # Ensure both heatmaps are the same size by using make_axes_locatable
     divider = make_axes_locatable(ax[1])
-    cax = divider.append_axes("right", size="9%", pad=0.2)
+    cax = divider.append_axes("right", size="5%", pad=0.2)
     cb = plt.colorbar(heatmap2, cax=cax)
     cb.set_label('Potential Prognostic Predictability', fontsize=18)
     cb.ax.tick_params(labelsize=18)
@@ -155,6 +156,7 @@ def plot_horizon_maps(iterated_dynamics_species1, iterated_dynamics_species2):
     plt.setp(ax[0].get_xticklabels(), fontsize=18)
     plt.setp(ax[0].get_yticklabels(), fontsize=18)
     plt.setp(ax[1].get_xticklabels(), fontsize=18)
+    plt.setp(ax[1].get_yticklabels(), fontsize=18)
 
     # Adjust layout and save the plot
     plt.tight_layout()

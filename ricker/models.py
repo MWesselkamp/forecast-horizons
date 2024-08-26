@@ -8,16 +8,19 @@ class RickerPredation(nn.Module):
     A neural network model representing a predation system based on the Ricker model.
     """
 
-    def __init__(self, initial_conditions, params, noise=None):
+    def __init__(self, initial_conditions, params, forcing_params, noise=None):
         super().__init__()
         self.initial_conditions = initial_conditions
         self.noise = noise
         self.model_params = self._initialize_parameters(params, noise)
+        self.forcing_params = forcing_params
+        self.resolution = self.forcing_params['resolution']
+        self.phase_shift = self.forcing_params['phase_shift']
 
     @classmethod
-    def create_instance(cls, initial_conditions, params, noise=None):
+    def create_instance(cls, initial_conditions, params, forcing_params, noise=None):
         # Creating an instance of the class within the class
-        return cls(initial_conditions, params, noise=None)
+        return cls(initial_conditions, params, forcing_params, noise=None)
     def _initialize_parameters(self, params, noise):
         """Initialize model parameters with optional noise."""
         param_list = params + [noise] if noise is not None else params
@@ -63,7 +66,7 @@ class RickerPredation(nn.Module):
 
         return out
 
-    def simulate_forcing(self, timesteps, freq_s=365, phase_shift=0, add_trend=False, add_noise=False):
+    def simulate_forcing(self, timesteps, add_trend=False, add_noise=False):
         """
         Simulate forcing data over a given number of timesteps.
 
@@ -77,8 +80,10 @@ class RickerPredation(nn.Module):
         Returns:
         - numpy.ndarray: Simulated forcing data.
         """
-        freq = timesteps / freq_s
+        freq = timesteps / self.resolution
         x = np.arange(timesteps)
+
+        phase_shift = np.pi * self.phase_shift
 
         # Apply the phase shift to the sine function
         y = np.sin(2 * np.pi * freq * (x / timesteps) + phase_shift)
@@ -91,22 +96,22 @@ class RickerPredation(nn.Module):
 
         return np.round(y, 4)
 
-    def create_observations(self, years, forcing = None, phase_shift = 0, split_data=True):
+    def create_observations(self, years, forcing = None, split_data=True):
         """
         Create observations.
         """
-        timesteps = 365 * years
-        phase_shift = np.pi * phase_shift
 
-        train_size = 365 * (years - 1)
+        timesteps = self.resolution * years
+
+        train_size = self.resolution * (years - 1)
 
         if forcing is None:
             forcing = self.simulate_forcing(timesteps=timesteps,
-                                            phase_shift = phase_shift,
                                             add_noise=True)
 
         observation_model = self.create_instance(initial_conditions = self.initial_conditions,
                                                  params=self.model_params,
+                                                 forcing_params = self.forcing_params,
                                                  noise=self.noise)
         observed_dynamics = observation_model.forward(forcing=torch.tensor(forcing, dtype=torch.double))
 
@@ -115,26 +120,13 @@ class RickerPredation(nn.Module):
         else:
             return torch.tensor(observed_dynamics)
 
-    def create_ensemble(self, ensemble_size, years=1, phase_shift= 0):
+    def create_ensemble(self, ensemble_size, forcing = None, years=1):
 
         ensemble = [
             self.create_observations(years=years,
-                                     phase_shift=phase_shift).get('y_test') for _ in range(ensemble_size)
+                                     forcing=forcing).get('y_test') for _ in range(ensemble_size)
                     ]
         ensemble = torch.stack(ensemble)
-
-        return ensemble
-
-    def iterate_ensemble(self, forcing, ensemble_size, years=1, phase_shift= 0):
-
-        self.ensemble = [
-            self.create_observations(years=years,
-                                     forcing = forcing,
-                                     phase_shift=phase_shift,
-                                     split_data=False) for _ in range(ensemble_size)
-                    ]
-
-        ensemble = torch.stack(self.ensemble)
 
         return ensemble
 
@@ -147,7 +139,7 @@ class RickerPredation(nn.Module):
 
         climatology = y_train#.view((-1, 365))
         sigma = np.std(climatology.detach().numpy())
-        sigma_train = np.tile(sigma, reps=(y_train.shape[1] // 365))
+        sigma_train = np.tile(sigma, reps=(y_train.shape[1] // self.resolution))
         sigma_test = sigma
 
         return {

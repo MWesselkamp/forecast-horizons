@@ -23,7 +23,6 @@ def create_dominant_heights_correlation_plot(measurements_subset, predictions_h1
     plt.ylabel("Predicted Dominant Height [m]")
     plt.legend(title='Species')
     #plt.title("Dominant Heights Correlation")
-    plt.grid(True)
     plt.savefig(output_file)
     plt.close()
 
@@ -272,47 +271,54 @@ def create_horizons_trajectories_plot(horizon_trajectories, horizons_df, output_
     plt.close()
 
 def create_horizons_assembled_plot(horizons_assembled, output_file):
+
+    plt.style.use('default')
     plt.figure(figsize=(7, 6))
 
+    # Get unique species from the DataFrame
+    unique_species = horizons_assembled['species_fullname'].unique()
+
+    # Define colors for each species using Matplotlib's colormap 'Set1'
+    colors = plt.get_cmap("Set1", len(unique_species))
+
     # Plot the ribbons for standard deviations
-    for species in horizons_assembled['species'].unique():
-        subset = horizons_assembled[horizons_assembled['species'] == species]
+    for i, species in enumerate(unique_species):
+        subset = horizons_assembled[horizons_assembled['species_fullname'] == species]
         plt.fill_between(
             subset['age'],
             subset['h_means'] - subset['h_sd'],
             subset['h_means'] + subset['h_sd'],
-            alpha=0.1, #label=f'{species} (SD)',
-            color=sns.color_palette("Set1")[list(horizons_assembled['species'].unique()).index(species)]
+            alpha=0.1,
+            color=colors(i)
         )
 
     # Plot the mean lines for each species
-    sns.lineplot(
-        data=horizons_assembled,
-        x='age', y='h_means', hue='species',
-        palette="Set1", linewidth=2
-    )
+    for i, species in enumerate(unique_species):
+        species_data = horizons_assembled[horizons_assembled['species_fullname'] == species]
+        plt.plot(species_data['age'], species_data['h_means'], label=species, color=colors(i), linewidth=2)
 
     # Add horizontal dashed line at y = 0
     plt.axhline(y=0, color='black', linewidth=2, linestyle='--')
 
     # Set labels
-    plt.xlabel("Lead time [age]", fontsize=16)
-    plt.ylabel("Absolute error [m]", fontsize=16)
-    plt.ylim((-7, 3))
+    plt.xlabel("Lead time [age]", fontsize=18)
+    plt.ylabel("Absolute error [m]", fontsize=18)
 
     # Adjust legend
-    plt.legend(title='Species', title_fontsize=16, fontsize=14)
+    plt.legend(fontsize=14,
+               ncol = 3,
+               loc='upper center')
 
     # Apply minimal theme and rotate x-axis labels
     plt.xticks(rotation=45, fontsize=16)
     plt.yticks(fontsize=16)
-    sns.despine()
+    plt.ylim((-7, 5))
 
     # Save the plot to a PDF file
     plt.tight_layout()
+    plt.grid(False)
     plt.savefig(output_file, format='pdf')
     plt.close()
-
 
 def create_thresholds_assembled_plot(thresholds_assembled, output_file):
     # Convert the DataFrame from wide to long format

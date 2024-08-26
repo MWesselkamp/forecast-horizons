@@ -1,5 +1,5 @@
 # Assuming prepare_data and visualisations are defined in separate Python files
-from iLand.data import get_data
+from iLand.data import *
 from iLand.visualisations import *
 
 measurements, predictions_h100, predictions = get_data()
@@ -15,7 +15,7 @@ for stand_idx in range(len(predictions_h100)):
     measurements_stand_idx['rid'] = predictions_h100['rid'][stand_idx]
     measurements_subset = pd.concat([measurements_subset, measurements_stand_idx], ignore_index=True)
 
-measurements_subset.to_csv("measurements_subset.csv", index=False)
+measurements_subset.to_csv("iLand/data/measurements_subset.csv", index=False)
 print(measurements_subset['species'].unique())
 print(len(measurements_subset['rid'].unique()))
 
@@ -165,7 +165,8 @@ def main(predictions, measurements, baumarten_char, create_horizons_trajectories
             'rho_lower': threshold_lowers
         })
 
-        create_horizons_trajectories_plot(horizon_trajectories, horizons_df, output_file=f"horizon_{species_name}.pdf")
+        create_horizons_trajectories_plot(horizon_trajectories, horizons_df,
+                                          output_file=f"iLand/plots/horizon_{species_name}.pdf")
 
         horizons_df_container.append(horizons_df)
         thresholds_container.append(thresholds_df)
@@ -183,6 +184,7 @@ horizons_assembled = pd.concat(horizons_df_container, ignore_index=True)
 thresholds_assembled = pd.concat(thresholds_container, ignore_index=True)
 residuals_assembled = pd.concat(residuals_container, ignore_index=True)
 
+horizons_assembled = add_species_fullname(horizons_assembled)
 create_horizons_assembled_plot(horizons_assembled,
                                output_file="iLand/plots/iLand_horizons_assembled.pdf")
 create_thresholds_assembled_plot(thresholds_assembled,
