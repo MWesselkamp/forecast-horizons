@@ -55,14 +55,33 @@ class RickerPredation(nn.Module):
         # Stack them to create a 2D tensor
         out = torch.stack([species_1, species_2])
 
+        # List to store Jacobians
+        jacobians = []
+
         for i in range(num_steps - 1):
+
+            # Detach the current state to ensure correct gradient computation for each timestep
+            out_t = out[:, i].detach().clone().requires_grad_(True)
+
             out[0, i + 1] = out[0, i] * torch.exp(alpha1 * (1 - beta1 * out[0, i] - gamma1 * out[1, i]
                                                             + bx1 * forcing[i] + cx1 * forcing[i] ** 2))
             out[1, i + 1] = out[1, i] * torch.exp(alpha2 * (1 - beta2 * out[1, i] - gamma2 * out[0, i]
                                                             + bx2 * forcing[i] + cx2 * forcing[i] ** 2))
             if sigma is not None:
-                noise_term = sigma * torch.normal(mean=torch.tensor([0.0]), std=torch.tensor([0.1]))
-                out[:, i + 1] += noise_term
+                out[:, i + 1] += sigma * torch.normal(mean=torch.tensor([0.0]), std=torch.tensor([0.1]))
+
+            # Compute the Jacobian of the next state w.r.t. the current state
+            jacobian = torch.autograd.functional.jacobian(
+                lambda x: torch.stack([
+                    x[0] * torch.exp(
+                        alpha1 * (1 - beta1 * x[0] - gamma1 * x[1] + bx1 * forcing[i] + cx1 * forcing[i] ** 2)),
+                    x[1] * torch.exp(
+                        alpha2 * (1 - beta2 * x[1] - gamma2 * x[0] + bx2 * forcing[i] + cx2 * forcing[i] ** 2))
+                ]), out_t)
+            # Append the Jacobian to the list
+            jacobians.append(jacobian)
+
+        self.jacobians = torch.stack(jacobians)
 
         return out
 
@@ -102,18 +121,13 @@ class RickerPredation(nn.Module):
         """
 
         timesteps = self.resolution * years
-
         train_size = self.resolution * (years - 1)
 
         if forcing is None:
             forcing = self.simulate_forcing(timesteps=timesteps,
                                             add_noise=True)
 
-        observation_model = self.create_instance(initial_conditions = self.initial_conditions,
-                                                 params=self.model_params,
-                                                 forcing_params = self.forcing_params,
-                                                 noise=self.noise)
-        observed_dynamics = observation_model.forward(forcing=torch.tensor(forcing, dtype=torch.double))
+        observed_dynamics = self.forward(forcing=torch.tensor(forcing, dtype=torch.double))
 
         if split_data:
             return self._process_observations(observed_dynamics, forcing, train_size)
@@ -151,6 +165,41 @@ class RickerPredation(nn.Module):
             'x_test': forcing_test,
             'climatology': climatology
         }
+
+    def compute_lyapunov_exponent(self, num_timesteps = None):
+        """
+        Compute the Lyapunov exponent over time based on Rogers 2021.
+
+        Parameters:
+        - num_timesteps : number of timesteps to compute the lyapunovs over.
+
+        Returns:
+        - float: The Lyapunov exponent.
+        """
+        # Ensure the Jacobians are in double precision for better accuracy
+        jacobians = self.jacobians.to(torch.float64)
+
+        if num_timesteps is None:
+            num_timesteps = jacobians.shape[0]
+
+        # Initialize the matrix product as the identity matrix
+        product_jacobian = torch.eye(2, dtype=torch.float64)
+
+        # Compute the product of Jacobians over time
+        for t in range(num_timesteps):
+            product_jacobian = torch.matmul(product_jacobian, jacobians[t,...])
+
+        # Compute the eigenvalues of the resulting product matrix
+        eigenvalues, _ = torch.linalg.eig(product_jacobian)
+
+        # Find the largest eigenvalue in magnitude and use only the real component
+        largest_eigenvalue = torch.max(torch.abs(eigenvalues.real))
+
+        # Compute the Lyapunov exponent by averaging over time.
+        lyapunov_exponent = (1 / num_timesteps) * torch.log(largest_eigenvalue)
+
+        return lyapunov_exponent.item()  # Convert to Python float
+
     def plot_time_series(self, observations_dict, series_name):
         """
         Plot the specified time series from the observations dictionary.

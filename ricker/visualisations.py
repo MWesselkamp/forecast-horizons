@@ -31,11 +31,12 @@ def plot_posterior(df, saveto=''):
     plt.savefig(os.path.join(saveto, 'posterior.pdf'))
     plt.close()
 
-def plot_ppp(species1_PPP, species2_PPP, PPP_threshold):
+def plot_ppp(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2):
     plt.figure(figsize=(7, 5))
     plt.plot(species1_PPP, label="Species 1", color="blue")
     plt.plot(species2_PPP, label="Species 2", color="green")
-    plt.hlines(PPP_threshold, xmin=0, xmax=len(species1_PPP), color="black", linestyles='--')
+    plt.hlines(PPP_threshold_species1, xmin=0, xmax=len(species1_PPP), color="darkblue", linestyles='--')
+    plt.hlines(PPP_threshold_species2, xmin=0, xmax=len(species1_PPP), color="darkgreen", linestyles='--')
 
     plt.xlabel("Time", fontsize=16)
     plt.ylabel("Potential Prognostic Predictability", fontsize=16)
@@ -80,7 +81,7 @@ def plot_ensemble(ensemble):
     plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.15)
     plt.legend()
     plt.show()
-def plot_combined(species1_PPP, species2_PPP, PPP_threshold, ensemble):
+def plot_combined(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2, ensemble):
     # Create a figure with two subplots arranged in two rows
     fig, ax = plt.subplots(2, 1, figsize=(8, 8),
                            sharex= True)  # 2 rows, 1 column
@@ -106,7 +107,8 @@ def plot_combined(species1_PPP, species2_PPP, PPP_threshold, ensemble):
     # Plot PPP for both species in the first subplot
     ax[1].plot(species1_PPP, label="Species 1", color="blue")
     ax[1].plot(species2_PPP, label="Species 2", color="green")
-    ax[1].hlines(PPP_threshold, xmin=0, xmax=len(species1_PPP), color="black", linestyles='--')
+    ax[1].hlines(PPP_threshold_species1, xmin=0, xmax=len(species1_PPP), color="darkblue", linestyles='--')
+    ax[1].hlines(PPP_threshold_species2, xmin=0, xmax=len(species1_PPP), color="darkgreen", linestyles='--')
 
     ax[1].set_xlabel("Time", fontsize=16)
     ax[1].set_ylabel("Potential Prognostic Predictability", fontsize=16)
@@ -127,20 +129,20 @@ def plot_combined(species1_PPP, species2_PPP, PPP_threshold, ensemble):
 
 def plot_horizon_maps(iterated_dynamics_species1, iterated_dynamics_species2):
     # Create subplots with equal aspect ratios
-    fig, ax = plt.subplots(1, 2, figsize=(16, 8), sharey=True)  # Two subplots side by side
+    fig, ax = plt.subplots(1, 2, figsize=(10, 8), sharey=True)  # Two subplots side by side
 
     # Plot heatmap for iterated_dynamics_species1
     heatmap1 = ax[0].imshow(iterated_dynamics_species1.transpose(),
                             vmin=0, origin='lower', cmap='OrRd_r', aspect='auto')
-    ax[0].set_xlabel('Initial time', fontsize=18)
-    ax[0].set_ylabel('Lead time', fontsize=18)
-    ax[0].set_title('Species 1', fontsize=18)
+    ax[0].set_xlabel('Initial time', fontsize=20)
+    ax[0].set_ylabel('Lead time', fontsize=20)
+    ax[0].set_title('Species 1', fontsize=20)
 
     # Plot heatmap for iterated_dynamics_species2
     heatmap2 = ax[1].imshow(iterated_dynamics_species2.transpose(),
                             vmin=0, origin='lower', cmap='OrRd_r', aspect='auto')
-    ax[1].set_xlabel('Initial time', fontsize=18)
-    ax[1].set_title('Species 2', fontsize=18)
+    ax[1].set_xlabel('Initial time', fontsize=20)
+    ax[1].set_title('Species 2', fontsize=20)
 
     # Reduce horizontal space between the subplots
     plt.subplots_adjust(wspace=0.1)
@@ -149,14 +151,14 @@ def plot_horizon_maps(iterated_dynamics_species1, iterated_dynamics_species2):
     divider = make_axes_locatable(ax[1])
     cax = divider.append_axes("right", size="5%", pad=0.2)
     cb = plt.colorbar(heatmap2, cax=cax)
-    cb.set_label('Potential Prognostic Predictability', fontsize=18)
-    cb.ax.tick_params(labelsize=18)
+    cb.set_label('Potential Prognostic Predictability', fontsize=20)
+    cb.ax.tick_params(labelsize=20)
 
     # Adjust tick label fontsize for both subplots
-    plt.setp(ax[0].get_xticklabels(), fontsize=18)
-    plt.setp(ax[0].get_yticklabels(), fontsize=18)
-    plt.setp(ax[1].get_xticklabels(), fontsize=18)
-    plt.setp(ax[1].get_yticklabels(), fontsize=18)
+    plt.setp(ax[0].get_xticklabels(), fontsize=20)
+    plt.setp(ax[0].get_yticklabels(), fontsize=20)
+    plt.setp(ax[1].get_xticklabels(), fontsize=20)
+    plt.setp(ax[1].get_yticklabels(), fontsize=20)
 
     # Adjust layout and save the plot
     plt.tight_layout()
