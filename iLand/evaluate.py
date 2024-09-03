@@ -31,6 +31,9 @@ create_dominant_height_deviations_plot(predictions_h100, measurements_subset,
 create_site_index_boundaries_plot(measurements_subset, predictions,
                                   rid_value=2,
                                   output_file="iLand/plots/yield_class_boundaries.pdf")
+create_boundaries_scheme_plot(measurements_subset,
+                                  rid_value=2,
+                                  output_file="iLand/plots/yield_class_boundaries_scheme.pdf")
 
 #create_idealized_measurements_timeseries_plot(boundaries, measurements_subset, predictions_h100,
 #                                              output_file="plots/idealized_measurements_timeseries.pdf")
@@ -185,10 +188,47 @@ thresholds_assembled = pd.concat(thresholds_container, ignore_index=True)
 residuals_assembled = pd.concat(residuals_container, ignore_index=True)
 
 horizons_assembled = add_species_fullname(horizons_assembled)
+thresholds_assembled = add_species_fullname(thresholds_assembled)
 create_horizons_assembled_plot(horizons_assembled,
                                output_file="iLand/plots/iLand_horizons_assembled.pdf")
 create_thresholds_assembled_plot(thresholds_assembled,
                                  output_file="iLand/plots/threshold_distribution.pdf")
+def find_horizon(df):
+    results = []
+
+    # Iterate over each species_fullname
+    for species, group in df.groupby('species_fullname'):
+        # Sort by age just in case
+        group_sorted = group.sort_values(by='age')
+
+        # Find the age where h_means < 0 for the first time
+        mean_age = group_sorted.loc[group_sorted['h_means'] < 0, 'age'].min()
+
+        # Find the age where h_means + h_sd < 0 for the first time
+        plus_sd_age = group_sorted.loc[(group_sorted['h_means'] + group_sorted['h_sd']) < 0, 'age'].min()
+
+        # Find the age where h_means - h_sd < 0 for the first time
+        minus_sd_age = group_sorted.loc[(group_sorted['h_means'] - group_sorted['h_sd']) < 0, 'age'].min()
+
+        # Append results as a dictionary
+        results.append({
+            'species_fullname': species,
+            'mean_age': mean_age,
+            'plus_sd_age': plus_sd_age,
+            'minus_sd_age': minus_sd_age
+        })
+
+    # Convert results to a DataFrame
+    result_df = pd.DataFrame(results)
+    return result_df
+
+# Find ages where h_means and h_means +/- h_sd < 0 for the first time
+result_df = find_horizon(horizons_assembled)
+print(result_df)
+
+# Plot the results
+plot_age_limit_by_species(result_df, output_file="iLand/plots/iLand_age_limits.pdf")
+
 
 df = residuals_assembled.groupby(['species', 'age']).apply(lambda x: x.assign(
     mean_resid_upper=x['resids_upper'].mean(),
