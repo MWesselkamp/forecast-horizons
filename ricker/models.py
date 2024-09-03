@@ -63,10 +63,14 @@ class RickerPredation(nn.Module):
             # Detach the current state to ensure correct gradient computation for each timestep
             out_t = out[:, i].detach().clone().requires_grad_(True)
 
+            sigma_forcing = 0.1
+            z1 = torch.normal(bx1 * forcing[i] + cx1 * forcing[i] ** 2, sigma_forcing)
+            z2 = torch.normal(bx2 * forcing[i] + cx2 * forcing[i] ** 2, sigma_forcing)
+
             out[0, i + 1] = out[0, i] * torch.exp(alpha1 * (1 - beta1 * out[0, i] - gamma1 * out[1, i]
-                                                            + bx1 * forcing[i] + cx1 * forcing[i] ** 2))
+                                                            + z1))
             out[1, i + 1] = out[1, i] * torch.exp(alpha2 * (1 - beta2 * out[1, i] - gamma2 * out[0, i]
-                                                            + bx2 * forcing[i] + cx2 * forcing[i] ** 2))
+                                                            + z2))
             if sigma is not None:
                 out[:, i + 1] += sigma * torch.normal(mean=torch.tensor([0.0]), std=torch.tensor([0.1]))
 
@@ -74,9 +78,9 @@ class RickerPredation(nn.Module):
             jacobian = torch.autograd.functional.jacobian(
                 lambda x: torch.stack([
                     x[0] * torch.exp(
-                        alpha1 * (1 - beta1 * x[0] - gamma1 * x[1] + bx1 * forcing[i] + cx1 * forcing[i] ** 2)),
+                        alpha1 * (1 - beta1 * x[0] - gamma1 * x[1] + z1)),
                     x[1] * torch.exp(
-                        alpha2 * (1 - beta2 * x[1] - gamma2 * x[0] + bx2 * forcing[i] + cx2 * forcing[i] ** 2))
+                        alpha2 * (1 - beta2 * x[1] - gamma2 * x[0] + z2))
                 ]), out_t)
             # Append the Jacobian to the list
             jacobians.append(jacobian)
@@ -113,7 +117,7 @@ class RickerPredation(nn.Module):
         if add_noise:
             y += np.random.normal(0, 0.08, timesteps)
 
-        return np.round(y, 4)
+        return torch.tensor(np.round(y, 4), dtype=torch.double)
 
     def create_observations(self, years, forcing = None, split_data=True):
         """
@@ -125,9 +129,9 @@ class RickerPredation(nn.Module):
 
         if forcing is None:
             forcing = self.simulate_forcing(timesteps=timesteps,
-                                            add_noise=True)
+                                            add_noise=False)
 
-        observed_dynamics = self.forward(forcing=torch.tensor(forcing, dtype=torch.double))
+        observed_dynamics = self.forward(forcing=forcing)
 
         if split_data:
             return self._process_observations(observed_dynamics, forcing, train_size)
