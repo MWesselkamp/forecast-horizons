@@ -1,7 +1,7 @@
 forcing:
 
     resolution: 200
-    phase_shift: 0.2
+    phase_shift: 0.0
     add_noise: True
 
 chaotic:

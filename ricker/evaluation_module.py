@@ -57,6 +57,33 @@ class EvaluationModule:
 
         return PPP_t
 
+    def normalised_variances(self, X, t, sigma_c, seasonal_normalisation = False):
+
+        N, M, T = X.shape
+        print("X.shape: ", N, M, T)
+
+        # Validate inputs
+        if not (0 <= t < T):
+            raise ValueError(f"Time index t={t} is out of bounds for tensor with T={T}.")
+        if M <= 1:
+            raise ValueError(f"Number of samples per group M={M} must be greater than 1 to avoid division by zero.")
+
+        # Step 1: Compute the mean over samples i for each group j at time t
+        # Shape of mean_j_t: (N,)
+        mean_j_t = X[:, :, t].mean(dim=1)
+
+        # Step 2: Compute the squared differences (X[j, i, t] - mean_j_t[j])^2
+        # Reshape mean_j_t to (N, 1) for broadcasting
+        diff_squared = (X[:, :, t] - mean_j_t.unsqueeze(1)) ** 2  # Shape: (N, M)
+
+        # Step 3: Normalize the squared differences by sigma_c^2
+        if seasonal_normalisation:
+            normalized_diff_squared = (1 / ((M - 1))) * diff_squared.sum(axis = 1) / (sigma_c[t] ** 2)  # Shape: (N, M)
+        else:
+            normalized_diff_squared = (1 / ((M - 1))) * diff_squared.sum(axis=1) / (sigma_c ** 2)
+
+        return normalized_diff_squared
+
     def PPP_threshold(self, df1, df2, alpha = 0.05):
 
         """

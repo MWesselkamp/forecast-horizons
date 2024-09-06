@@ -28,9 +28,15 @@ climatological_data = observation_model.create_observations(years=10)
 climatology = climatological_data.get('climatology').view((2, 9, config['forcing']['resolution']))
 climatological_variability_species1 = torch.std(climatology[0, :, :])
 climatological_variability_species2 = torch.std(climatology[1, :, :])
+climatological_variability_seasonal_species1 = torch.tensor([torch.std(climatology[0, :, t]) for t in range(climatology.shape[2])])
+climatological_variability_seasonal_species2 = torch.tensor([torch.std(climatology[1, :, t]) for t in range(climatology.shape[2])])
 
 plt.plot(climatology[0,:,:].detach().numpy().transpose(), color = "blue")
 plt.plot(climatology[1,:,:].detach().numpy().transpose(), color = "green")
+plt.show()
+
+plt.plot(climatological_variability_seasonal_species1, color = "blue")
+plt.plot(climatological_variability_seasonal_species2, color = "green")
 plt.show()
 
 lyapunovs = [observation_model.compute_lyapunov_exponent(t) for t in range(1, climatological_data['y_train'].shape[1])]
@@ -84,6 +90,26 @@ plot_ppp(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_speci
 
 plot_combined(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2, ensemble)
 
+species1_normalised_variances = np.array([
+    Evaluation.normalised_variances(species1_X, t, climatological_variability_species1).detach().numpy() for t in range(species1_X.shape[2])])
+
+species2_normalised_variances = np.array([
+    Evaluation.normalised_variances(species2_X, t, climatological_variability_species2).detach().numpy() for t in range(species2_X.shape[2])])
+
+
+plot_combined_2(species1_normalised_variances, species2_normalised_variances,
+              species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2,
+                time_horizon = 28)
+
+plot_combined_3(species1_normalised_variances, species2_normalised_variances,
+                species1_X[0,...].detach().numpy().transpose(), species2_X[0,...].detach().numpy().transpose(),
+              PPP_threshold_species1, PPP_threshold_species2,
+                time_horizon = 28)
+
+# =========================================== #
+# horizons from different initial conditions  #
+# =========================================== #
+
 x_test_rep = np.concat((observed_data.get('x_test'), observed_data.get('x_test')))
 
 iterated_dynamics_species1 = []
@@ -124,5 +150,11 @@ iterated_dynamics_species2 = torch.stack(iterated_dynamics_species2).detach().nu
 print(np.array(lyapunovs).min())
 print(np.array(lyapunovs).max())
 
-plot_horizon_maps(iterated_dynamics_species1[:60,:70],
-                  iterated_dynamics_species2[:60,:70])
+horizons_species1 = (iterated_dynamics_species1 < PPP_threshold_species1).astype(int)
+horizons_species2 = (iterated_dynamics_species2 < PPP_threshold_species2).astype(int)
+
+plot_horizon_maps(iterated_dynamics_species1[:60,:60],
+                  iterated_dynamics_species2[:60,:60])
+
+plot_binary_horizon_maps(horizons_species1[:80,:80],
+                  horizons_species2[:80,:80])

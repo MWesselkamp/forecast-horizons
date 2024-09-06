@@ -45,6 +45,7 @@ class RickerPredation(nn.Module):
         """Compute the population dynamics."""
 
         (alpha1, beta1, gamma1, bx1, cx1, alpha2, beta2, gamma2, bx2, cx2), sigma = params
+        sigma_forcing = 0.08
 
         forcing = forcing.squeeze()
         num_steps = len(forcing)
@@ -63,14 +64,11 @@ class RickerPredation(nn.Module):
             # Detach the current state to ensure correct gradient computation for each timestep
             out_t = out[:, i].detach().clone().requires_grad_(True)
 
-            sigma_forcing = 0.1
             z1 = torch.normal(bx1 * forcing[i] + cx1 * forcing[i] ** 2, sigma_forcing)
             z2 = torch.normal(bx2 * forcing[i] + cx2 * forcing[i] ** 2, sigma_forcing)
 
-            out[0, i + 1] = out[0, i] * torch.exp(alpha1 * (1 - beta1 * out[0, i] - gamma1 * out[1, i]
-                                                            + z1))
-            out[1, i + 1] = out[1, i] * torch.exp(alpha2 * (1 - beta2 * out[1, i] - gamma2 * out[0, i]
-                                                            + z2))
+            out[0, i + 1] = out[0, i] * torch.exp(alpha1 * (1 - beta1 * out[0, i] - gamma1 * out[1, i] + z1))
+            out[1, i + 1] = out[1, i] * torch.exp(alpha2 * (1 - beta2 * out[1, i] - gamma2 * out[0, i] + z2))
             if sigma is not None:
                 out[:, i + 1] += sigma * torch.normal(mean=torch.tensor([0.0]), std=torch.tensor([0.1]))
 
