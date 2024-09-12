@@ -32,8 +32,8 @@ def add_species_fullname(predictions_h100):
     return predictions_h100
 
 # Function to subset and add species information to measurements
-def process_measurements(measurements):
-    baumarten_num = [1, 2, 3, 4, 5, 7]
+def process_measurements(measurements, baumarten_num = [1, 2, 3, 4, 5, 7]):
+
     species_map_num_to_char = {
         1: "piab",
         2: "abal",
@@ -96,12 +96,12 @@ def create_and_save_plots(predictions_h100, measurements, output_dir="iLand/plot
     plt.close()
 
 # Main function to run the script
-def get_data():
+def get_data(baumarten_num = [1, 2, 3, 4, 5, 7]):
 
     measurements, predictions_h100, predictions = read_data()
     inspect_data(measurements, predictions_h100, predictions)
     predictions_h100 = add_species_fullname(predictions_h100)
-    measurements = process_measurements(measurements)
+    measurements = process_measurements(measurements, baumarten_num)
     create_and_save_plots(predictions_h100, measurements)
 
     return measurements, predictions_h100, predictions

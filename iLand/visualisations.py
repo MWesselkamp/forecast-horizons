@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import tol_colors as tc
+
+from iLand.data import add_species_fullname
 
 def create_dominant_heights_correlation_plot(measurements_subset, predictions_h100, output_file, width=6, height=6):
 
@@ -59,6 +62,59 @@ def create_dominant_height_deviations_plot(predictions_h100, measurements_subset
     plt.title('Dominant Height Deviations')
     plt.savefig(output_file)
     plt.close()
+
+def create_site_index_boundaries_plot_new(measurements_subset, predictions, rid_value, output_file):
+    # Filter and label the data based on dGz100 values (selection of specific classes)
+    species = measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]
+
+    # Filter for specific yield classes (8, 9, 11, 12)
+    df_8 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 8)].copy()
+    df_8['type'] = '8'
+
+    df_9 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 9)].copy()
+    df_9['type'] = '9'
+
+    df_11 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 11)].copy()
+    df_11['type'] = '11'
+
+    df_12 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 12)].copy()
+    df_12['type'] = '12'
+
+    # Combine the selected dataframes
+    all_lines = pd.concat([df_8, df_9, df_11, df_12])
+
+    plt.figure(figsize=(7, 6))
+
+    # Plot each yield class line
+    for line_type, data in all_lines.groupby('type'):
+        plt.plot(data['Alter'], data['Ho'], label=f'Class {line_type}',
+                 color='lightblue' if line_type in ['8', '12'] else 'blue', linewidth=1)
+
+    # Plot the '10' line from the measurements_subset
+    data_10 = measurements_subset[measurements_subset['rid'] == rid_value]
+    plt.plot(data_10['Alter'], data_10['Ho'], color='black', linewidth=2, label='Class 10')
+
+    # Plot the mean of all predictions across all rid values
+    mean_predictions = predictions.groupby('age')['dominant_height'].mean().reset_index()
+    plt.plot(mean_predictions['age'], mean_predictions['dominant_height'], color='red', linewidth=2, label='Mean y_hat')
+
+    # Add vertical dashed line at x = 100
+    plt.axvline(x=100, color='black', linestyle='--')
+
+    # Customize the legend and labels
+    plt.xlabel('Time [Age]', fontsize=16)
+    plt.ylabel('Dominant height [m]', fontsize=16)
+    plt.xticks(rotation=45, fontsize=12)
+    plt.yticks(fontsize=12)
+
+    # Customize the legend
+    plt.legend(title='Yield class (g)', title_fontsize=16, fontsize=12)
+
+    # Adjust layout and save the plot
+    plt.tight_layout()
+    plt.savefig(output_file, format='pdf')
+    plt.close()
+
 
 def create_site_index_boundaries_plot(measurements_subset, predictions, rid_value, output_file):
     # Filter and label the data based on dGz100 values
@@ -191,58 +247,69 @@ def create_boundaries_scheme_plot(measurements_subset, rid_value, output_file):
     plt.savefig(output_file, format='pdf')
     plt.close()
 
-def create_idealized_measurements_timeseries_plot(boundaries, measurements_subset, predictions_h100, output_file):
+def create_idealized_measurements_timeseries_plot(measurements_subset, predictions_h100, output_file):
     # Create the boundaries dataframe by grouping and summarizing
     boundaries = measurements_subset.groupby(['Alter', 'species']).agg(
         min_Ho=('Ho', 'min'),
         max_Ho=('Ho', 'max')
     ).reset_index()
 
-    plt.figure(figsize=(5, 7))
+    # Filter species list to remove "pisy"
+    measurements_subset = add_species_fullname(measurements_subset)
+    species_list = measurements_subset['species'].unique()
+    species_list = [species for species in species_list if species != 'pisy']
+    species_names = [species for species in measurements_subset['species_fullname'].unique() if species != "Pinus \nsylvestris"]
 
-    # Plot the ribbon (shaded area between min_Ho and max_Ho)
-    for species in boundaries['species'].unique():
-        species_data = boundaries[boundaries['species'] == species]
-        plt.fill_between(
-            species_data['Alter'], species_data['min_Ho'], species_data['max_Ho'],
-            alpha=0.3, label=f'{species} range'
+    # Create subplots: one for each species
+    fig, axes = plt.subplots(len(species_list), 1, figsize=(5, 7),
+                             sharex=True, sharey=True)
+
+    # If only one species, wrap axes in a list to make it iterable
+    if len(species_list) == 1:
+        axes = [axes]
+
+    cmap = tc.tol_cmap('light')  # Extract 5 colors from the "Set1" colormap
+    colors = cmap(np.linspace(0.2, 1, 5))
+
+    # Plot for each species in its own subplot
+    for i, species in enumerate(species_list):
+        ax = axes[i]
+
+        # Filter data for the current species and age between 45 and 110
+        species_data = boundaries[(boundaries['species'] == species) ] #  & (boundaries['Alter'] >=45 ) & (boundaries['Alter'] <= 110)
+        species_measurements = measurements_subset[(measurements_subset['species'] == species) ] #& (measurements_subset['Alter'] >= 45) & (measurements_subset['Alter'] <= 110)]
+        species_predictions = predictions_h100[(predictions_h100['species'] == species)]
+
+        # Plot the ribbon (shaded area between min_Ho and max_Ho)
+        #ax.fill_between(
+        #    species_data['Alter'], species_data['min_Ho'], species_data['max_Ho'],
+        #    alpha=0.2, color = colors[i]
+        #)
+
+        ax.plot(
+            species_measurements['Alter'], species_measurements['Ho'],
+            linestyle='-', alpha=0.6, linewidth=0.6, color = colors[i]
         )
 
-    # Plot the line for measurements_subset
-    sns.lineplot(
-        data=measurements_subset,
-        x='Alter', y='Ho', hue='species',
-        estimator=None, units='rid', alpha=0.5, linewidth=1
-    )
+        ax.scatter(
+            [100] * len(species_predictions), species_predictions['dominant_height'],
+            s=50, alpha=0.6, edgecolor='black', color='white', linewidth=0.7,
+        )
 
-    # Plot the points for predictions at age 100
-    sns.scatterplot(
-        data=predictions_h100,
-        x=[100] * len(predictions_h100), y='dominant_height',
-        hue='species', style='species', s=50, alpha=0.7,
-        edgecolor='black', linewidth=0.7
-    )
+        ax.set_ylabel(species_names[i], fontsize=14)
+        ax.yaxis.set_label_position("right")
+        ax.tick_params(axis='both', which='major', labelsize=16)
 
-    # Set the palette
-    sns.set_palette("Set1")
-
-    # Labels and title
     plt.xlabel("Age", fontsize=16)
-    plt.ylabel("Dominant height [m]", fontsize=16)
-    plt.xticks(rotation=45, fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.title("dGz100 Reconstructed Observations", fontsize=18)
+    # Set shared y-axis label
+    fig.text(0.01, 0.5, 'Dominant height [m]', va='center', rotation='vertical', fontsize=16)
 
-    # Adjust the legend
-    plt.legend(title="Species", title_fontsize=16, fontsize=12)
-
-    # Minimal theme
-    sns.despine()
-
-    # Save the plot to a file
+    # Only one legend, placed on the top right
+    handles, labels = ax.get_legend_handles_labels()
+    #fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=2, fontsize=12, title="Legend")
+    plt.subplots_adjust(left=0.14, right=0.88, hspace=0.2)
     plt.savefig(output_file, format='pdf')
     plt.close()
-
 
 def create_residuals_boxplots(predictions_h100, measurements_subset, output_file):
     stands = predictions_h100['rid'].unique()
@@ -352,30 +419,31 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
     unique_species = horizons_assembled['species_fullname'].unique()
 
     # Define colors for each species using Matplotlib's colormap 'Set1'
-    colors = plt.get_cmap("Set1", len(unique_species))
+    cmap = tc.tol_cmap('light')  # Extract 5 colors from the "Set1" colormap
+    colors = cmap(np.linspace(0.2, 1, 5))
 
     # Plot the ribbons for standard deviations
     for i, species in enumerate(unique_species):
         subset = horizons_assembled[horizons_assembled['species_fullname'] == species]
         plt.fill_between(
             subset['age'],
-            subset['h_means'] - subset['h_sd'],
-            subset['h_means'] + subset['h_sd'],
+            subset['h_means'] - 2*subset['h_sd'],
+            subset['h_means'] + 2*subset['h_sd'],
             alpha=0.1,
-            color=colors(i)
+            color=colors[i]
         )
 
     # Plot the mean lines for each species
     for i, species in enumerate(unique_species):
         species_data = horizons_assembled[horizons_assembled['species_fullname'] == species]
-        plt.plot(species_data['age'], species_data['h_means'], label=species, color=colors(i), linewidth=2)
+        plt.plot(species_data['age'], species_data['h_means'], label=species, color=colors[i], linewidth=2)
 
     # Add horizontal dashed line at y = 0
     plt.axhline(y=0, color='black', linewidth=2, linestyle='--')
 
     # Set labels
     plt.xlabel("Lead time [age]", fontsize=18)
-    plt.ylabel("Absolute error [m]", fontsize=18)
+    plt.ylabel("AE - $\\rho$ [m]", fontsize=18)
 
     # Adjust legend
     plt.legend(fontsize=14,
@@ -385,7 +453,7 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
     # Apply minimal theme and rotate x-axis labels
     plt.xticks(rotation=45, fontsize=16)
     plt.yticks(fontsize=16)
-    plt.ylim((-7, 5))
+    plt.ylim((-8.5, 7))
 
     # Save the plot to a PDF file
     plt.tight_layout()
@@ -477,5 +545,72 @@ def plot_age_limit_by_species(result_df, output_file):
     plt.xlim((40, 115))
     plt.grid(False)
     plt.tight_layout()
+    plt.savefig(output_file, format='pdf')
+    plt.close()
+
+
+def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
+    """
+    Plot the mean age by species for multiple result DataFrames.
+    The x-axis represents the AE cut-off thresholds, and the y-axis represents the mean age.
+    Each species is plotted with dots connected by lines across the datasets, with filled confidence intervals.
+
+    Parameters:
+    - result_dfs: List of result DataFrames.
+    - thresholds: List of AE cut-off thresholds to label the x-axis.
+    - output_file: Path to save the resulting plot as a PDF.
+    """
+    fig, ax = plt.subplots(figsize=(8, 7))
+
+    # Define markers and colors to differentiate between species
+    markers = ['o', 's', '^', 'D', '*']  # Marker styles for different species
+    cmap = tc.tol_cmap('light')  # Extract 5 colors from the "Set1" colormap
+    colors = cmap(np.linspace(0.2, 1, 5))
+    species_names = result_dfs[0]['species_fullname'].unique()  # Get unique species names from the first DataFrame
+
+    # Create a plot for each species across the DataFrames
+    for species_idx, species in enumerate(species_names):
+        mean_ages = []
+        lower_bounds = []
+        upper_bounds = []
+
+        # Gather mean ages and errors for this species across all DataFrames
+        for i, result_df in enumerate(result_dfs):
+            species_data = result_df[result_df['species_fullname'] == species]
+            if not species_data.empty:
+                mean_age = species_data['mean_age'].values[0]
+                plus_sd_age = species_data['plus_sd_age'].values[0]
+                minus_sd_age = species_data['minus_sd_age'].values[0]
+
+                lower_bound = mean_age - minus_sd_age if not pd.isna(minus_sd_age) else mean_age
+                upper_bound = mean_age + plus_sd_age if not pd.isna(plus_sd_age) else mean_age
+
+                mean_ages.append(mean_age)
+                lower_bounds.append(lower_bound)
+                upper_bounds.append(upper_bound)
+
+        # Plot the mean ages connected by lines for the current species
+        x_values = list(range(1, len(mean_ages) + 1))  # DataFrame numbers (1, 2, 3, ...)
+        ax.hlines(y=110, xmin=min(x_values), xmax=max(x_values), linestyles="--",
+                  color="black", linewidth=1.3)
+        ax.hlines(y=45, xmin=min(x_values), xmax=max(x_values), linestyles="--",
+                  color="black", linewidth=1.3)
+        ax.plot(x_values, mean_ages, marker=markers[species_idx % len(markers)],
+                color=colors[species_idx], label=species,
+                markersize=10, linewidth=2.6, alpha=0.9)
+        # Add filled confidence intervals for the current species
+        # ax.fill_between(x_values, lower_bounds, upper_bounds, color=colors[species_idx], alpha=0.2)
+
+    # Customize the plot appearance
+    ax.set_xticks(range(1, len(thresholds) + 1))  # Set x-axis ticks for DataFrame numbers
+    ax.set_xticklabels([f'{t}' for t in thresholds], fontsize=18)  # Set the threshold labels
+    ax.set_xlabel('$\\rho$ [m]', fontsize=18)
+    ax.set_ylabel('Forecast horizon [Age]', fontsize=18)
+    ax.tick_params(axis='both', labelsize=18)
+
+    # Move the legend to the top
+    #ax.legend(fontsize=12, title='Species', title_fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=3)
+    plt.tight_layout()
+    # Save the plot
     plt.savefig(output_file, format='pdf')
     plt.close()
