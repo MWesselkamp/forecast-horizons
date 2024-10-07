@@ -57,32 +57,9 @@ class EcDataset(Dataset):
         # Use xarray to open the Zarr store
         self.ds_ecland = xr.open_zarr(path)
 
-        # Apply bounding box filter using xarray capabilities
+        # Apply bounding box filter on space if specified in config
         if config['bounding_box'] is not None:
-
-            # Print the bounding box values from the config
-            print("Bounding box from config:", config['bounding_box'])
-            
-            ds_ecland_idx = self.ds_ecland.x.where(
-                (self.ds_ecland.lat > config['bounding_box'][0]) & 
-                (self.ds_ecland.lat < config['bounding_box'][1]) & 
-                (self.ds_ecland.lon > config['bounding_box'][2]) & 
-                (self.ds_ecland.lon < config['bounding_box'][3])
-            ).compute()  # Convert the Dask array to a NumPy array
-
-            # Drop coordinates that do not satisfy the condition
-            ds_ecland_idx = ds_ecland_idx.dropna(dim='x', how='all')
-
-            self.ds_ecland = self.ds_ecland.sel(x=ds_ecland_idx)
-
-            # Check the size of the spatial dimension after filtering
-            spatial_size_after_filter = self.ds_ecland.dims['x']  # Get the size of 'x' dimension
-            print(f"Size of the spatial dimension 'x' after bounding box filtering: {spatial_size_after_filter}")
-    
-            # If the spatial size is zero, raise an informative error
-            if spatial_size_after_filter == 0:
-                raise ValueError("The spatial dimension 'x' is empty after applying the bounding box filter. "
-                         "Please check the bounding box configuration or data availability.")
+            self._apply_bounding_box_filter(self)
 
         # Create time index to select the appropriate data range
         try:
@@ -98,31 +75,19 @@ class EcDataset(Dataset):
 
         self.start_index = min(np.argwhere(date_times.year == int(start_yr)))[0]
         self.end_index = max(np.argwhere(date_times.year == int(end_yr)))[0]
-        print("Start index", self.start_index)
+        print("Temporal start index", self.start_index, "Temporal end index", self.end_index)
 
         self.times = np.array(date_times[self.start_index : self.end_index])
         self.len_dataset = self.end_index - self.start_index
         print("Length of dataset:", self.len_dataset)
 
-        # Select points in space
-        self.x_idxs = (0, None) if "None" in x_idxs else x_idxs
-        self.x_size = len(self.ds_ecland["x"][slice(*self.x_idxs)])
-        self.lats = self.ds_ecland["lat"][slice(*self.x_idxs)]
-        self.lons = self.ds_ecland["lon"][slice(*self.x_idxs)]
+        # Will initialise x_idxs dependent on if we use one or multiple grid cells.
+        self._initialize_spatial_indices()
         print("Spatial size of data set:", self.x_size)
         print("Spatial indices of data set:", self.x_idxs)
         
-        # If spatial sampling is active, create container with random indices.
-        if self.spatial_sample_size is not None:
-            print("Activate spatial sampling of x_idxs")
-            self.spatial_sample_size = self.find_spatial_sample_size(self.spatial_sample_size)
-            print("Spatial sample size:", self.spatial_sample_size)
-            self.chunked_x_idxs = self.chunk_indices(self.spatial_sample_size)
-            self.chunk_size = len(self.chunked_x_idxs)
-            print("Chunk size:", self.chunk_size)
-        else:
-            print("Use all x_idx from global.")
-            self.spatial_sample_size = None
+        # Initialise an appropriate spatial sample size based on a given reference size
+        self._initialize_spatial_sampling()
 
         # List of climatological time-invariant features
         self.static_feat_lst = config["clim_feats"]
@@ -166,23 +131,103 @@ class EcDataset(Dataset):
         self.y_prog_stdevs = tensor(self.ds_ecland.data_stdevs.values[self.targ_index])
         self.y_prog_maxs = tensor(self.ds_ecland.data_maxs.values[self.targ_index])
 
-        # Create time-invariant static climatological features
-        clim_data = self.ds_ecland.clim_data.values[slice(*self.x_idxs), :]
+        # Create time-invariant static climatological features for one or multiple grid cells.
+        if isinstance(x_idxs, int):
+            clim_data = self.ds_ecland.clim_data.values[self.x_idxs]
+        else:
+            clim_data = self.ds_ecland.clim_data.values[slice(*self.x_idxs), :]
+
         if clim_data.size == 0:
             raise ValueError("Selected climatological data is empty. Check the slicing indices and data availability.")
-        # Convert the data to a tensor
         x_static = tensor(clim_data)
+        print(x_static.shape)
+        print(self.clim_index)
 
-        x_static = x_static[:, self.clim_index]
+        try:
+            x_static = x_static[:, self.clim_index]
+        except IndexError:
+            x_static = x_static[self.clim_index]
+
+        print(x_static.shape)
         self.x_static_scaled = self.stat_transform(
             x_static, means=self.clim_means, stds=self.clim_stdevs, maxs=self.clim_maxs
         ).reshape(1, self.x_size, -1)
+
+        print(self.x_static_scaled.shape)
+    
+    def _initialize_spatial_indices(self):
+        # Helper method to initialize the spatial indices
+        if isinstance(self.x_idxs, int):
+            self._handle_single_grid_cell()
+        else:
+            self._handle_multiple_grid_cells()
+
+    def _handle_single_grid_cell(self):
+        # Handle the case where x_idxs is a single integer (one grid cell)
+        print("Using a single grid cell")
+        self.x_size = 1
+        self.lats = self.ds_ecland["lat"][self.x_idxs]
+        self.lons = self.ds_ecland["lon"][self.x_idxs]
+
+    def _handle_multiple_grid_cells(self):
+        # Handle the case where x_idxs represents multiple grid cells
+        print("Using multiple grid cells")
+        self.x_idxs = (0, None) if "None" in self.x_idxs else tuple(self.x_idxs)
+        self.x_size = len(self.ds_ecland["x"][slice(*self.x_idxs)])
+        self.lats = self.ds_ecland["lat"][slice(*self.x_idxs)]
+        self.lons = self.ds_ecland["lon"][slice(*self.x_idxs)]
+
+    def _apply_bounding_box_filter(self):
+        # Helper method to apply the bounding box filter
+        bounding_box = self.config['bounding_box']
+            
+        # Print the bounding box values from the config
+        print("Bounding box from config:", bounding_box)
+            
+        # Apply the bounding box filter using xarray capabilities
+        ds_ecland_idx = self.ds_ecland.x.where(
+            (self.ds_ecland.lat > bounding_box[0]) & 
+            (self.ds_ecland.lat < bounding_box[1]) & 
+            (self.ds_ecland.lon > bounding_box[2]) & 
+            (self.ds_ecland.lon < bounding_box[3])
+        ).compute()  # Convert the Dask array to a NumPy array
+            
+        # Drop coordinates that do not satisfy the condition
+        ds_ecland_idx = ds_ecland_idx.dropna(dim='x', how='all')
+
+        # Update the dataset with the filtered indices
+        self.ds_ecland = self.ds_ecland.sel(x=ds_ecland_idx)
+
+        # Check the size of the spatial dimension after filtering
+        spatial_size_after_filter = self.ds_ecland.dims['x']
+        print(f"Size of the spatial dimension 'x' after bounding box filtering: {spatial_size_after_filter}")
+    
+        # If the spatial size is zero, raise an error
+        if spatial_size_after_filter == 0:
+            raise ValueError("The spatial dimension 'x' is empty after applying the bounding box filter. "
+                                "Please check the bounding box configuration or data.")
+
+    def _initialize_spatial_sampling(self):
+
+        # Helper method to initialize spatial sampling
+        # If spatial sampling is active, creates container with random indices.
+
+        if self.spatial_sample_size is not None:
+            print("Activate spatial sampling of x_idxs")
+            self.spatial_sample_size = self.find_spatial_sample_size(self.spatial_sample_size)
+            print("Spatial sample size:", self.spatial_sample_size)
+            self.chunked_x_idxs = self.chunk_indices(self.spatial_sample_size)
+            self.chunk_size = len(self.chunked_x_idxs)
+            print("Chunk size:", self.chunk_size)
+        else:
+            print("Use all x_idx from data set.")
+            self.spatial_sample_size = None
+            self.chunk_size = len(self.x_idxs) if isinstance(self.x_idxs, list) else 1
 
     def chunk_indices(self, chunk_size = 2000):
 
         indices = list(range(self.x_size))
         random.shuffle(indices)
-        
         spatial_chunks = [indices[i:i + chunk_size] for i in range(0, self.x_size, chunk_size)]
         
         return spatial_chunks
@@ -263,6 +308,22 @@ class EcDataset(Dataset):
         x = (x * kwargs["maxs"])  # + 1e-5
         return x
 
+    def _slice_dataset(self):
+
+        # Helper method for flexibility in slicing
+        if isinstance(self.x_idxs, int):
+            print("Select one grid cell from data")
+            return self.ds_ecland.isel(
+                time=slice(self.start_index, self.end_index),
+                x=self.x_idxs
+            ).expand_dims("x", axis=1)
+        else:
+            print("Select slice from data")
+            return self.ds_ecland.isel(
+                time=slice(self.start_index, self.end_index),
+                x=slice(*self.x_idxs)
+            )
+        
     def load_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         
         """Load data into memory. **CAUTION ONLY USE WHEN WORKING WITH DATASET THAT FITS IN MEM**
@@ -270,23 +331,17 @@ class EcDataset(Dataset):
         :return: static_features, dynamic_features, prognostic_targets, diagnostic_targets
         """
     
-        # Select the relevant slice of data using xarray's isel() for indexes
-        ds_slice = self.ds_ecland.isel(
-            time=slice(self.start_index, self.end_index),  # Using 'time' as the dimension name
-            x=slice(*self.x_idxs)
-        )
-    
+        ds_slice = self._slice_dataset()
+
         # Extract dynamic features, convert to numpy array for transformations
-        X = ds_slice['data'].isel(variable=self.dynamic_index).values
-        X = tensor(X)  # Convert to tensor if necessary
+        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
         X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
     
         # Static features are already precomputed and stored in x_static_scaled
         X_static = self.x_static_scaled
     
         # Extract prognostic targets, convert to numpy array for transformations
-        Y_prog = ds_slice['data'].isel(variable=self.targ_index).values
-        Y_prog = tensor(Y_prog)  # Convert to tensor if necessary
+        Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values)
         Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs, maxs=self.y_prog_maxs)
     
         # Check the model type and handle increment calculation or diagnostic target selection
@@ -298,26 +353,35 @@ class EcDataset(Dataset):
         else:
             if self.targ_diag_index is not None:
                 # Extract diagnostic targets, convert to numpy array for transformations
-                Y_diag = ds_slice['data'].isel(variable=self.targ_diag_index).values
-                Y_diag = tensor(Y_diag)  # Convert to tensor if necessary
+                Y_diag = tensor(ds_slice['data'].isel(variable=self.targ_diag_index).values)
                 Y_diag = self.diag_transform(Y_diag, means=self.y_diag_means, stds=self.y_diag_stdevs, maxs=self.y_diag_maxs)
                 return X_static, X, Y_prog, Y_diag
     
             else:
                 return X_static, X, Y_prog
             
+    def _calculate_effective_length(self):
+        return self.len_dataset - 1 - self.rollout
+    
+    def _get_size_factor(self):
+        return self.chunk_size if self.spatial_sample_size is not None else self.x_size
+    
     # number of rows in the dataset
     def __len__(self):
         
-        return ((self.len_dataset - 1 - self.rollout) * self.chunk_size) if self.spatial_sample_size is not None else ((self.len_dataset - 1 - self.rollout) * self.x_size) 
-
+        effective_length = self._calculate_effective_length()
+        size_factor = self._get_size_factor()
+    
+        return effective_length * size_factor
+    
     # get a row at an index
     def __getitem__(self, idx):
 
         # print(f"roll: {self.rollout}, lends: {self.len_dataset}, x_size: {self.x_size}")
-         
-        t_start_idx = (idx % (self.len_dataset - 1 - self.rollout)) + self.start_index
-        t_end_idx = (idx % (self.len_dataset - 1 - self.rollout)) + self.start_index + self.lookback + self.rollout + 1
+        effective_length = self._calculate_effective_length()
+
+        t_start_idx = (idx % effective_length) + self.start_index
+        t_end_idx = (idx % effective_length) + self.start_index + self.lookback + self.rollout + 1
         
         if self.spatial_sample_size is not None:
             x_idx = [x + self.x_idxs[0] for x in self.chunked_x_idxs[(idx % self.chunk_size)]]
