@@ -23,7 +23,6 @@ def create_dominant_heights_correlation_plot(measurements_subset, predictions_h1
     plt.ylabel("Predicted Dominant Height [m]")
     plt.legend(title='Species')
     #plt.title("Dominant Heights Correlation")
-    plt.grid(True)
     plt.savefig(output_file)
     plt.close()
 
@@ -116,6 +115,79 @@ def create_site_index_boundaries_plot(measurements_subset, predictions, rid_valu
     sns.set_theme(style="whitegrid")
 
     # Save the plot to a file
+    plt.savefig(output_file, format='pdf')
+    plt.close()
+
+def create_boundaries_scheme_plot(measurements_subset, rid_value, output_file):
+    # Filter and label the data based on dGz100 values
+    df_8 = measurements_subset[(measurements_subset['species'] ==
+                                measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
+                               (measurements_subset['dGz100'] == 8)].copy()
+    df_8['type'] = '8'
+
+    df_12 = measurements_subset[(measurements_subset['species'] ==
+                                 measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
+                                (measurements_subset['dGz100'] == 12)].copy()
+    df_12['type'] = '12'
+
+    df_9 = measurements_subset[(measurements_subset['species'] ==
+                                measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
+                               (measurements_subset['dGz100'] == 9)].copy()
+    df_9['type'] = '9'
+
+    df_11 = measurements_subset[(measurements_subset['species'] ==
+                                 measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
+                                (measurements_subset['dGz100'] == 11)].copy()
+    df_11['type'] = '11'
+
+    # Combine all dataframes
+    all_lines = pd.concat([df_8, df_12, df_9, df_11])
+
+    plt.figure(figsize=(7, 6))
+    label_mapping = {'8': f'+/-2$\\rho$', '12': 'Label2', '9': '+/-$\\rho$', '11': 'Label3'}
+
+    # Plot each group
+    sns.lineplot(data=all_lines, x='Alter', y='Ho', hue='type', linewidth=2.5,
+                 palette={'8': 'lightsalmon', '12': 'lightsalmon', '9': 'red', '11': 'red'})
+
+    # Plot the '10' line from the measurements_subset
+    sns.lineplot(data=measurements_subset[measurements_subset['rid'] == rid_value], x='Alter', y='Ho', color='black',
+                 linewidth=2.5, label='Reference')
+
+    # Plot the predictions line
+
+    # Add vertical dashed line at x = 100
+    plt.axvline(x=100, color='black', linestyle='--')
+
+    # Customize the legend and labels
+    plt.xlabel('Time', fontsize=26)
+    plt.ylabel('State unit', fontsize=26)
+    plt.xticks([])
+    plt.yticks([])
+
+    # Customize the legend
+    handles, labels = plt.gca().get_legend_handles_labels()
+    new_labels = [label_mapping.get(label, label) for label in labels]
+
+    filtered_handles_labels = [(h, l) for h, l in zip(handles, new_labels) if l not in ['Label2', 'Label3']]
+    filtered_handles, filtered_labels = zip(*filtered_handles_labels)
+
+    plt.legend(filtered_handles, filtered_labels, loc='upper left', bbox_to_anchor=(0, 1.15), title='', ncol=3,
+               title_fontsize=16, fontsize=20)
+
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_color('black')
+    ax.spines['left'].set_color('black')
+    ax.spines['bottom'].set_linewidth(2)  # Increase linewidth of the x-axis spine
+    ax.spines['left'].set_linewidth(2)
+
+    # Minimal theme
+    sns.set_theme(style="whitegrid")
+
+    # Save the plot to a file
+    plt.tight_layout()
     plt.savefig(output_file, format='pdf')
     plt.close()
 
@@ -272,52 +344,59 @@ def create_horizons_trajectories_plot(horizon_trajectories, horizons_df, output_
     plt.close()
 
 def create_horizons_assembled_plot(horizons_assembled, output_file):
+
+    plt.style.use('default')
     plt.figure(figsize=(7, 6))
 
+    # Get unique species from the DataFrame
+    unique_species = horizons_assembled['species_fullname'].unique()
+
+    # Define colors for each species using Matplotlib's colormap 'Set1'
+    colors = plt.get_cmap("Set1", len(unique_species))
+
     # Plot the ribbons for standard deviations
-    for species in horizons_assembled['species'].unique():
-        subset = horizons_assembled[horizons_assembled['species'] == species]
+    for i, species in enumerate(unique_species):
+        subset = horizons_assembled[horizons_assembled['species_fullname'] == species]
         plt.fill_between(
             subset['age'],
             subset['h_means'] - subset['h_sd'],
             subset['h_means'] + subset['h_sd'],
-            alpha=0.1, #label=f'{species} (SD)',
-            color=sns.color_palette("Set1")[list(horizons_assembled['species'].unique()).index(species)]
+            alpha=0.1,
+            color=colors(i)
         )
 
     # Plot the mean lines for each species
-    sns.lineplot(
-        data=horizons_assembled,
-        x='age', y='h_means', hue='species',
-        palette="Set1", linewidth=2
-    )
+    for i, species in enumerate(unique_species):
+        species_data = horizons_assembled[horizons_assembled['species_fullname'] == species]
+        plt.plot(species_data['age'], species_data['h_means'], label=species, color=colors(i), linewidth=2)
 
     # Add horizontal dashed line at y = 0
     plt.axhline(y=0, color='black', linewidth=2, linestyle='--')
 
     # Set labels
-    plt.xlabel("Lead time [age]", fontsize=16)
-    plt.ylabel("Absolute error [m]", fontsize=16)
-    plt.ylim((-7, 3))
+    plt.xlabel("Lead time [age]", fontsize=18)
+    plt.ylabel("Absolute error [m]", fontsize=18)
 
     # Adjust legend
-    plt.legend(title='Species', title_fontsize=16, fontsize=14)
+    plt.legend(fontsize=14,
+               ncol = 3,
+               loc='upper center')
 
     # Apply minimal theme and rotate x-axis labels
     plt.xticks(rotation=45, fontsize=16)
     plt.yticks(fontsize=16)
-    sns.despine()
+    plt.ylim((-7, 5))
 
     # Save the plot to a PDF file
     plt.tight_layout()
+    plt.grid(False)
     plt.savefig(output_file, format='pdf')
     plt.close()
-
 
 def create_thresholds_assembled_plot(thresholds_assembled, output_file):
     # Convert the DataFrame from wide to long format
     thresholds_assembled_long = thresholds_assembled.melt(
-        id_vars=['species'],
+        id_vars=['species_fullname'],
         value_vars=['rho_upper', 'rho_lower'],
         var_name='threshold',
         value_name='rho'
@@ -326,39 +405,77 @@ def create_thresholds_assembled_plot(thresholds_assembled, output_file):
     # Custom labels for the facets
     custom_labels = {"rho_lower": "Lower", "rho_upper": "Upper"}
 
-    plt.figure(figsize=(8, 6))
+    # Increase the size of the plot panel to accommodate x-ticklabels
+    plt.figure(figsize=(14, 14))
 
     # Facet by threshold
-    g = sns.FacetGrid(thresholds_assembled_long, col='threshold', col_wrap=2, sharey=True)
+    g = sns.FacetGrid(thresholds_assembled_long, col='threshold',
+                      col_wrap=2,
+                      sharey=True,
+                      height=4.5,  # Increase height of each facet for more space
+                      aspect=1.2  # Increase aspect ratio for wider panels
+    )
     g.map_dataframe(
         sns.boxplot,
-        x='species', y='rho', hue='species',
-        palette='Set1'
-    )
+        x='species_fullname', y='rho', hue='species_fullname',
+        palette='Set1')
 
     # Adjust the transparency of the boxes
     for ax in g.axes.flat:
         for patch in ax.artists:
             patch.set_alpha(0.7)
 
-    g.set_axis_labels("Species", "Threshold [m]", fontsize = 16)
+    g.set_axis_labels("", "Threshold [m]", fontsize=16)
 
     # Adjust facet titles
     for ax, title in zip(g.axes.flat, thresholds_assembled_long['threshold'].unique()):
-        ax.set_title(custom_labels[title], fontsize = 16)
+        ax.set_title(custom_labels[title], fontsize=16)
 
-    # Customize plot appearance
+    # Customize plot appearance and adjust x-tick labels
     for ax in g.axes.flat:
         ax.tick_params(axis='x', rotation=45, labelsize=14)
         ax.tick_params(axis='y', labelsize=14)
 
     # Adjust the layout to fix spacing issues
-    #g.fig.subplots_adjust(top=0.9, bottom=0.1, left=0.15, right=0.9, hspace=0.25, wspace=0.1)
+    g.fig.subplots_adjust(top=0.9, bottom=0.2, left=0.1, right=0.9, hspace=0.4, wspace=0.3)
 
     # Align y-axis labels by ensuring consistent padding
     for ax in g.axes.flat:
         ax.yaxis.labelpad = 10
 
+    plt.tight_layout()
+    plt.savefig(output_file, format='pdf')
+    plt.close()
+
+def plot_age_limit_by_species(result_df, output_file):
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Loop through each row in the result DataFrame
+    for index, row in result_df.iterrows():
+        species = row['species_fullname']
+        mean_age = row['mean_age']
+        plus_sd_age = row['plus_sd_age']
+        minus_sd_age = row['minus_sd_age']
+
+        # Calculate error bars
+        lower_error = mean_age - minus_sd_age if not pd.isna(minus_sd_age) else 0
+        upper_error = plus_sd_age - mean_age if not pd.isna(plus_sd_age) else 0
+
+        # Plot the mean age with error bars
+        ax.errorbar(mean_age, index, xerr=[[lower_error], [upper_error]],
+                    fmt='o',
+                    markersize=12,  # Increase marker size
+                    elinewidth=3,  # Increase error bar line width
+                    capsize=5,
+                    label=species)
+
+    ax.set_yticks(range(len(result_df)))
+    ax.set_yticklabels(result_df['species_fullname'], fontsize = 20)
+    ax.set_xlabel('Age', fontsize = 20)
+    ax.tick_params(axis='x', labelsize=20)  # Increase size of x-tick labels
+    ax.tick_params(axis='y', labelsize=20)  # Increase size of y-tick labels
+    plt.xlim((40, 115))
+    plt.grid(False)
     plt.tight_layout()
     plt.savefig(output_file, format='pdf')
     plt.close()

@@ -5,7 +5,7 @@ import os
 
 # Function to read data
 def read_data():
-    measurements = pd.read_csv("./data/site_index_dat.csv", sep=",")
+    measurements = pd.read_csv("iLand/data/site_index_dat.csv", sep=",")
     predictions_h100 = pd.read_csv("iLand/data/stadtwald_testing_results_h100.txt", sep="\s+")
     predictions = pd.read_csv("iLand/data/stadtwald_testing_results_SI_time_series.txt", sep="\s+")
     return measurements, predictions_h100, predictions
@@ -59,7 +59,7 @@ def process_measurements(measurements):
     return measurements
 
 # Function to create and save plots
-def create_and_save_plots(predictions_h100, measurements, output_dir="plots"):
+def create_and_save_plots(predictions_h100, measurements, output_dir="iLand/plots"):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 

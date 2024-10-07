@@ -8,16 +8,19 @@ class RickerPredation(nn.Module):
     A neural network model representing a predation system based on the Ricker model.
     """
 
-    def __init__(self, initial_conditions, params, noise=None):
+    def __init__(self, initial_conditions, params, forcing_params, noise=None):
         super().__init__()
         self.initial_conditions = initial_conditions
         self.noise = noise
         self.model_params = self._initialize_parameters(params, noise)
+        self.forcing_params = forcing_params
+        self.resolution = self.forcing_params['resolution']
+        self.phase_shift = self.forcing_params['phase_shift']
 
     @classmethod
-    def create_instance(cls, initial_conditions, params, noise=None):
+    def create_instance(cls, initial_conditions, params, forcing_params, noise=None):
         # Creating an instance of the class within the class
-        return cls(initial_conditions, params, noise=None)
+        return cls(initial_conditions, params, forcing_params, noise=None)
     def _initialize_parameters(self, params, noise):
         """Initialize model parameters with optional noise."""
         param_list = params + [noise] if noise is not None else params
@@ -52,18 +55,37 @@ class RickerPredation(nn.Module):
         # Stack them to create a 2D tensor
         out = torch.stack([species_1, species_2])
 
+        # List to store Jacobians
+        jacobians = []
+
         for i in range(num_steps - 1):
+
+            # Detach the current state to ensure correct gradient computation for each timestep
+            out_t = out[:, i].detach().clone().requires_grad_(True)
+
             out[0, i + 1] = out[0, i] * torch.exp(alpha1 * (1 - beta1 * out[0, i] - gamma1 * out[1, i]
                                                             + bx1 * forcing[i] + cx1 * forcing[i] ** 2))
             out[1, i + 1] = out[1, i] * torch.exp(alpha2 * (1 - beta2 * out[1, i] - gamma2 * out[0, i]
                                                             + bx2 * forcing[i] + cx2 * forcing[i] ** 2))
             if sigma is not None:
-                noise_term = sigma * torch.normal(mean=torch.tensor([0.0]), std=torch.tensor([0.1]))
-                out[:, i + 1] += noise_term
+                out[:, i + 1] += sigma * torch.normal(mean=torch.tensor([0.0]), std=torch.tensor([0.1]))
+
+            # Compute the Jacobian of the next state w.r.t. the current state
+            jacobian = torch.autograd.functional.jacobian(
+                lambda x: torch.stack([
+                    x[0] * torch.exp(
+                        alpha1 * (1 - beta1 * x[0] - gamma1 * x[1] + bx1 * forcing[i] + cx1 * forcing[i] ** 2)),
+                    x[1] * torch.exp(
+                        alpha2 * (1 - beta2 * x[1] - gamma2 * x[0] + bx2 * forcing[i] + cx2 * forcing[i] ** 2))
+                ]), out_t)
+            # Append the Jacobian to the list
+            jacobians.append(jacobian)
+
+        self.jacobians = torch.stack(jacobians)
 
         return out
 
-    def simulate_forcing(self, timesteps, freq_s=365, phase_shift=0, add_trend=False, add_noise=False):
+    def simulate_forcing(self, timesteps, add_trend=False, add_noise=False):
         """
         Simulate forcing data over a given number of timesteps.
 
@@ -77,8 +99,10 @@ class RickerPredation(nn.Module):
         Returns:
         - numpy.ndarray: Simulated forcing data.
         """
-        freq = timesteps / freq_s
+        freq = timesteps / self.resolution
         x = np.arange(timesteps)
+
+        phase_shift = np.pi * self.phase_shift
 
         # Apply the phase shift to the sine function
         y = np.sin(2 * np.pi * freq * (x / timesteps) + phase_shift)
@@ -91,50 +115,32 @@ class RickerPredation(nn.Module):
 
         return np.round(y, 4)
 
-    def create_observations(self, years, forcing = None, phase_shift = 0, split_data=True):
+    def create_observations(self, years, forcing = None, split_data=True):
         """
         Create observations.
         """
-        timesteps = 365 * years
-        phase_shift = np.pi * phase_shift
 
-        train_size = 365 * (years - 1)
+        timesteps = self.resolution * years
+        train_size = self.resolution * (years - 1)
 
         if forcing is None:
             forcing = self.simulate_forcing(timesteps=timesteps,
-                                            phase_shift = phase_shift,
                                             add_noise=True)
 
-        observation_model = self.create_instance(initial_conditions = self.initial_conditions,
-                                                 params=self.model_params,
-                                                 noise=self.noise)
-        observed_dynamics = observation_model.forward(forcing=torch.tensor(forcing, dtype=torch.double))
+        observed_dynamics = self.forward(forcing=torch.tensor(forcing, dtype=torch.double))
 
         if split_data:
             return self._process_observations(observed_dynamics, forcing, train_size)
         else:
             return torch.tensor(observed_dynamics)
 
-    def create_ensemble(self, ensemble_size, years=1, phase_shift= 0):
+    def create_ensemble(self, ensemble_size, forcing = None, years=1):
 
         ensemble = [
             self.create_observations(years=years,
-                                     phase_shift=phase_shift).get('y_test') for _ in range(ensemble_size)
+                                     forcing=forcing).get('y_test') for _ in range(ensemble_size)
                     ]
         ensemble = torch.stack(ensemble)
-
-        return ensemble
-
-    def iterate_ensemble(self, forcing, ensemble_size, years=1, phase_shift= 0):
-
-        self.ensemble = [
-            self.create_observations(years=years,
-                                     forcing = forcing,
-                                     phase_shift=phase_shift,
-                                     split_data=False) for _ in range(ensemble_size)
-                    ]
-
-        ensemble = torch.stack(self.ensemble)
 
         return ensemble
 
@@ -147,7 +153,7 @@ class RickerPredation(nn.Module):
 
         climatology = y_train#.view((-1, 365))
         sigma = np.std(climatology.detach().numpy())
-        sigma_train = np.tile(sigma, reps=(y_train.shape[1] // 365))
+        sigma_train = np.tile(sigma, reps=(y_train.shape[1] // self.resolution))
         sigma_test = sigma
 
         return {
@@ -159,6 +165,41 @@ class RickerPredation(nn.Module):
             'x_test': forcing_test,
             'climatology': climatology
         }
+
+    def compute_lyapunov_exponent(self, num_timesteps = None):
+        """
+        Compute the Lyapunov exponent over time based on Rogers 2021.
+
+        Parameters:
+        - num_timesteps : number of timesteps to compute the lyapunovs over.
+
+        Returns:
+        - float: The Lyapunov exponent.
+        """
+        # Ensure the Jacobians are in double precision for better accuracy
+        jacobians = self.jacobians.to(torch.float64)
+
+        if num_timesteps is None:
+            num_timesteps = jacobians.shape[0]
+
+        # Initialize the matrix product as the identity matrix
+        product_jacobian = torch.eye(2, dtype=torch.float64)
+
+        # Compute the product of Jacobians over time
+        for t in range(num_timesteps):
+            product_jacobian = torch.matmul(product_jacobian, jacobians[t,...])
+
+        # Compute the eigenvalues of the resulting product matrix
+        eigenvalues, _ = torch.linalg.eig(product_jacobian)
+
+        # Find the largest eigenvalue in magnitude and use only the real component
+        largest_eigenvalue = torch.max(torch.abs(eigenvalues.real))
+
+        # Compute the Lyapunov exponent by averaging over time.
+        lyapunov_exponent = (1 / num_timesteps) * torch.log(largest_eigenvalue)
+
+        return lyapunov_exponent.item()  # Convert to Python float
+
     def plot_time_series(self, observations_dict, series_name):
         """
         Plot the specified time series from the observations dictionary.
@@ -192,119 +233,3 @@ class RickerPredation(nn.Module):
         )]
         sigma_str = f"sigma: {self.noise}" if self.noise is not None else "sigma: N/A"
         return "Model Parameters:\n" + ", ".join(param_values) + f", {sigma_str}"
-
-class Ricker_Ensemble(nn.Module):
-    """
-     Single-Species extended Ricker with Ensemble prediction.
-    """
-
-    def __init__(self, params, noise=None, initial_uncertainty = None):
-
-        super().__init__()
-
-        if (not noise is None) & (not initial_uncertainty is None):
-            self.model_params = torch.nn.Parameter(torch.tensor(params + [noise] + [initial_uncertainty], requires_grad=True, dtype=torch.double))
-            self.initial_uncertainty = initial_uncertainty
-            self.noise = noise
-        elif (not noise is None) & (initial_uncertainty is None):
-            self.model_params = torch.nn.Parameter(torch.tensor(params + [noise], requires_grad=True, dtype=torch.double))
-            self.initial_uncertainty = initial_uncertainty
-            self.noise = noise
-        elif (noise is None) & (not initial_uncertainty is None):
-            self.model_params = torch.nn.Parameter(torch.tensor(params + [initial_uncertainty], requires_grad=True, dtype=torch.double))
-            self.initial_uncertainty = initial_uncertainty
-            self.noise = noise
-        elif (noise is None) & (initial_uncertainty is None):
-            self.model_params = torch.nn.Parameter(torch.tensor(params, requires_grad=True, dtype=torch.double))
-            self.noise = noise
-            self.initial_uncertainty = initial_uncertainty
-
-    def forward(self, N0, Temp, ensemble_size=15):
-
-        if (not self.noise is None) & (not self.initial_uncertainty is None):
-            alpha, beta, bx, cx, sigma, phi = self.model_params
-        elif (not self.noise is None) & (self.initial_uncertainty is None):
-            alpha, beta, bx, cx, sigma = self.model_params
-        elif (self.noise is None) & (not self.initial_uncertainty is None):
-            alpha, beta, bx, cx, phi = self.model_params
-        else:
-            alpha, beta, bx, cx = self.model_params
-
-        Temp = Temp.squeeze()
-
-        if not self.initial_uncertainty is None:
-            initial = N0 + phi * torch.normal(torch.zeros((ensemble_size)), torch.repeat_interleave(torch.tensor([.1, ]), ensemble_size))
-            out = torch.zeros((len(initial), len(Temp)), dtype=torch.double)
-        else:
-            initial = N0
-            out = torch.zeros((1, len(Temp)), dtype=torch.double)
-
-        out[:,0] = initial  # initial value
-
-        if not self.noise is None:
-            for i in range(len(Temp) - 1):
-                out[:,i + 1] = out.clone()[:,i] * torch.exp(
-                    alpha * (1 - beta * out.clone()[:,i] + bx * Temp[i] + cx * Temp[i] ** 2))# \
-                          #   + sigma * torch.normal(mean=torch.tensor([0.0, ]), std=torch.tensor([1.0, ]))
-            var = sigma * 2#torch.normal(mean=torch.tensor([0.0, ]), std=torch.tensor([1.0, ]))
-            out_upper = out + torch.repeat_interleave(var, len(Temp)) #+ torch.full_like(out, var.item())
-            out_lower = out - torch.repeat_interleave(var, len(Temp))  #- torch.full_like(out, var.item())
-
-            return out, [out_upper, out_lower]
-
-        else:
-            for i in range(len(Temp) - 1):
-                out[:,i + 1] = out.clone()[:,i] * torch.exp(
-                    alpha * (1 - beta * out.clone()[:,i] + bx * Temp[i] + cx * Temp[i] ** 2))
-
-            return out, None
-
-    def get_fit(self):
-
-        return {"alpha": self.model_params[0].item(), \
-            "beta": self.model_params[1].item(), \
-                "bx": self.model_params[2].item(), \
-                    "cx": self.model_params[3].item(), \
-               "sigma": self.noise if self.noise is None else self.model_params[4].item(), \
-               "phi": self.initial_uncertainty if self.initial_uncertainty is None else (self.model_params[5].item() if self.noise is not None else self.model_params[4].item())
-                }
-
-    def forecast(self, N0, Temp, ensemble_size=15):
-
-        if (not self.noise is None) & (not self.initial_uncertainty is None):
-            alpha, beta, bx, cx, sigma, phi = self.model_params
-        elif (not self.noise is None) & (self.initial_uncertainty is None):
-            alpha, beta, bx, cx, sigma = self.model_params
-        elif (self.noise is None) & (not self.initial_uncertainty is None):
-            alpha, beta, bx, cx, phi = self.model_params
-        else:
-            alpha, beta, bx, cx = self.model_params
-
-        Temp = Temp.squeeze()
-
-        if not self.initial_uncertainty is None:
-            initial = N0 + phi * torch.normal(torch.zeros((ensemble_size)),
-                                              torch.repeat_interleave(torch.tensor([.1, ]), ensemble_size))
-            out = torch.zeros((len(initial), len(Temp)), dtype=torch.double)
-        else:
-            initial = N0
-            out = torch.zeros((1, len(Temp)), dtype=torch.double)
-
-        out[:, 0] = initial  # initial value
-
-        if not self.noise is None:
-            for i in range(len(Temp) - 1):
-                out[:, i + 1] = out.clone()[:, i] * torch.exp(
-                    alpha * (1 - beta * out.clone()[:, i] + bx * Temp[i] + cx * Temp[i] ** 2))  \
-                    + sigma * torch.normal(mean=torch.tensor([0.0, ]), std=torch.tensor([0.1, ]))
-
-            #out = out + sigma * torch.normal(mean=torch.tensor([0.0, ]), std=torch.tensor([1.0, ]))
-
-            return out
-
-        else:
-            for i in range(len(Temp) - 1):
-                out[:, i + 1] = out.clone()[:, i] * torch.exp(
-                    alpha * (1 - beta * out.clone()[:, i] + bx * Temp[i] + cx * Temp[i] ** 2))
-
-            return out
