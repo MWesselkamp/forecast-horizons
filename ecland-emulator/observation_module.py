@@ -15,17 +15,16 @@ class ObservationModule:
         self.station = station
 
     def load_station(self, 
-                    data_path = '/perm/dadf/HSAF_validation/in_situ_data/pre_processed_data/ismn_nc'):
+                     data_path = '/perm/dadf/HSAF_validation/in_situ_data/pre_processed_data/ismn_nc'):
 
         # Load measurements from one soil data station
         self.station_data = xr.open_dataset(os.path.join(data_path,self.station))
-        print(self.station_data.lat)
 
     def load_forcing(self,
                      year = "2022",
                     data_path = "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i6aj_o400_2010_2022_6h_euro.zarr"):
+        
         self.forcing = xr.open_zarr(data_path).data.sel(time=slice(year)).to_dataset()
-        print(self.forcing.lat)
 
     def match_station_with_forcing(self):
 
@@ -34,7 +33,6 @@ class ObservationModule:
         lon_a = self.station_data.lon.values  
         lon_b = self.forcing.lon.values 
 
-        print(lat_a)
         closest_indices = []
         for lat, lon in zip(lat_a, lon_a):
             print("Get Euclidean Distance.")
@@ -52,18 +50,21 @@ class ObservationModule:
 
         return closest_indices
 
-    def process_station_data(self):
+    def process_station_data(self, 
+                             variable = 'st'):
+
+        soil_temperature = self.station_data["st"] 
 
         print("Converting celsius into kelvin")
-        station_data = self.station_data + 273.15
+        soil_temperature = soil_temperature + 273.15
 
         print("Resampling to 6-hourly mean.")
-        station_data_6hr_mean = station_data.resample(time='6h').mean()
+        station_data_6hr_mean = soil_temperature.resample(time='6h').mean()
         print(station_data_6hr_mean.head())
         print("Length of data set:", len(station_data_6hr_mean['time']))
 
         print("Turn into tensor.")
-        station_data_6hr_mean_tensor = torch.tensor(station_data_6hr_mean.values)
+        station_data_6hr_mean_tensor = torch.tensor(station_data_6hr_mean.values, dtype=torch.float32)
 
         return station_data_6hr_mean_tensor
 

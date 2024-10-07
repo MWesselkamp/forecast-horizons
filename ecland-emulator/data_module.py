@@ -39,7 +39,9 @@ class EcDataset(Dataset):
         end_yr
     ):
         
-        x_idxs=config["x_slice_indices"]
+        self.x_idxs=config["x_slice_indices"]
+        if isinstance(self.x_idxs, np.integer):
+            self.x_idxs = int(self.x_idxs)
         
         self.spatial_sample_size = config["spatial_sample_size"]
             
@@ -132,7 +134,8 @@ class EcDataset(Dataset):
         self.y_prog_maxs = tensor(self.ds_ecland.data_maxs.values[self.targ_index])
 
         # Create time-invariant static climatological features for one or multiple grid cells.
-        if isinstance(x_idxs, int):
+        if isinstance(self.x_idxs, int):
+            print("isint")
             clim_data = self.ds_ecland.clim_data.values[self.x_idxs]
         else:
             clim_data = self.ds_ecland.clim_data.values[slice(*self.x_idxs), :]
