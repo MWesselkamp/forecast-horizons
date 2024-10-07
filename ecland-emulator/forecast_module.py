@@ -34,12 +34,6 @@ class ForecastModule:
         if 'MLP' in type(model).__name__:
             print("Instance is mlp model")
             self.filename = 'mlp'
-        elif 'LSTM' in type(model).__name__:
-            print("Instance is lstm model")
-            self.filename = 'lstm'
-        elif type(model).__name__ == 'Booster':
-            print("Instance is XGBModel")
-            self.filename = 'xgb'
         else:
             print("Model type is:", type(model))
             print("Don't know model type")
@@ -63,10 +57,7 @@ class ForecastModule:
         """
         dataset.x_idxs = chunk_idx
         
-        if self.filename == 'xgb':
-            X_static, X_met, Y_prog, Y_inc = dataset.load_data()  
-        else:
-             X_static, X_met, Y_prog = dataset.load_data() 
+        X_static, X_met, Y_prog = dataset.load_data() 
             
         self.dataset = dataset
 
@@ -98,9 +89,7 @@ class ForecastModule:
             
             print("Setting model to evaluation mode")
             self.model.eval()
-            
-        elif isinstance(self.model, xgb.Booster):
-            Y_prog_prediction = Y_prog.numpy().copy()
+
         else:
             print("Don't know model type.")
         
@@ -118,26 +107,6 @@ class ForecastModule:
                     logits = self.model.forward(X_static, X_met[[time_idx]], Y_prog_prediction[[time_idx]])
                     Y_prog_prediction[time_idx+1, ...] = Y_prog_prediction[time_idx, ...] + logits.squeeze()
             
-        elif self.filename == 'lstm':
-
-            print("Y_prog_prediction shape:", Y_prog_prediction.shape)
-            preds = self.model.forecast(X_static, X_met, Y_prog)
-            print("LSTM preds shape:", preds.shape)
-            Y_prog_prediction[self.model.lookback:, ...] = preds.squeeze()
-
-            Y_prog_prediction = Y_prog_prediction[self.model.lookback:, ...]
-            Y_prog = Y_prog[self.model.lookback:, ...]
-
-        elif self.filename == 'xgb':
-                
-            for time_idx in range(Y_prog_prediction.shape[0]-1):
-                
-                if time_idx % 10 == 0:
-                    print(f"on step {time_idx}...")                        
-                step_predictors = xgb.DMatrix(np.concatenate((X_static, X_met[[time_idx]], Y_prog_prediction[[time_idx]]), axis=-1).squeeze())
-                logits = self.model.predict(step_predictors)
-                Y_prog_prediction[time_idx+1, ...] = Y_prog_prediction[time_idx, ...] + logits.squeeze()
-
 
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -164,32 +133,24 @@ class ForecastModule:
         Not applicable for global data set sizes, also not recommended to use this with continental size.
         """
         
-        if self.scale == 'europe':
-            
-            if (self.filename == 'lstm') | (self.filename == 'mlp'):
+        print("Backtransforming")
+        self.dynamic_features_prediction = self.dataset.dynamic_feat_scalar.inv_transform(self.dynamic_features_prediction.cpu()).numpy()
+        self.dynamic_features = self.dataset.dynamic_feat_scalar.inv_transform(self.dynamic_features.cpu()).numpy()
 
-                print("Backtransforming")
-                self.dynamic_features_prediction = self.dataset.dynamic_feat_scalar.inv_transform(self.dynamic_features_prediction.cpu()).numpy()
-                self.dynamic_features = self.dataset.dynamic_feat_scalar.inv_transform(self.dynamic_features.cpu()).numpy()
-
-            obs_array = xr.DataArray(self.dynamic_features,
+        obs_array = xr.DataArray(self.dynamic_features,
                                   coords={"time": self.dataset.full_times[:self.dynamic_features.shape[0]],
                                           "location": self.dataset.ds_ecland['x'],
                                           "variable": self.dataset.dynamic_feat_lst},
                                      dims=["time", "x", "variable"])
-            obs_array.to_netcdf(os.path.join(save_to, f'fc_ecland_{self.filename}.nc'))
-            print("saved reference data to: ", os.path.join(save_to, f'fc_ecland_{self.filename}.nc'))
+        obs_array.to_netcdf(os.path.join(save_to, f'fc_ecland_{self.filename}.nc'))
+        print("saved reference data to: ", os.path.join(save_to, f'fc_ecland_{self.filename}.nc'))
 
-            preds_array = xr.DataArray(self.dynamic_features_prediction,
+        preds_array = xr.DataArray(self.dynamic_features_prediction,
                                   coords={"time": self.dataset.full_times[:self.dynamic_features_prediction.shape[0]],
                                           "location": self.dataset.ds_ecland['x'],
                                           "variable": self.dataset.dynamic_feat_lst},
                                       dims=["time", "x", "variable"])
-            preds_array.to_netcdf(os.path.join(save_to, f'fc_ailand_{self.filename}.nc'))
-            print("saved forecast to: ", os.path.join(save_to, f'fc_ecland_{self.filename}.nc'))
+        preds_array.to_netcdf(os.path.join(save_to, f'fc_ailand_{self.filename}.nc'))
+        print("saved forecast to: ", os.path.join(save_to, f'fc_ecland_{self.filename}.nc'))
 
-            return self.dynamic_features, self.dynamic_features_prediction
-    
-        else:
-            
-            print("Don't know scale to save data at.")
+        return self.dynamic_features, self.dynamic_features_prediction

@@ -54,30 +54,64 @@ class EcDataset(Dataset):
         self.prog_transform, self.prog_inv_transform = self.select_transform(config["prog_transform"])
         self.diag_transform, self.diag_inv_transform = self.select_transform(config["diag_transform"])
 
-        self.ds_ecland = zarr.open(path)
-        # Create time index to select appropriate data range
-        date_times = pd.to_datetime(
-            cftime.num2pydate(
-                self.ds_ecland["time"], self.ds_ecland["time"].attrs["units"]
-            )
-        )
+        # Use xarray to open the Zarr store
+        self.ds_ecland = xr.open_zarr(path)
+
+        # Apply bounding box filter using xarray capabilities
+        if config['bounding_box'] is not None:
+
+            # Print the bounding box values from the config
+            print("Bounding box from config:", config['bounding_box'])
+            
+            ds_ecland_idx = self.ds_ecland.x.where(
+                (self.ds_ecland.lat > config['bounding_box'][0]) & 
+                (self.ds_ecland.lat < config['bounding_box'][1]) & 
+                (self.ds_ecland.lon > config['bounding_box'][2]) & 
+                (self.ds_ecland.lon < config['bounding_box'][3])
+            ).compute()  # Convert the Dask array to a NumPy array
+
+            # Drop coordinates that do not satisfy the condition
+            ds_ecland_idx = ds_ecland_idx.dropna(dim='x', how='all')
+
+            self.ds_ecland = self.ds_ecland.sel(x=ds_ecland_idx)
+
+            # Check the size of the spatial dimension after filtering
+            spatial_size_after_filter = self.ds_ecland.dims['x']  # Get the size of 'x' dimension
+            print(f"Size of the spatial dimension 'x' after bounding box filtering: {spatial_size_after_filter}")
+    
+            # If the spatial size is zero, raise an informative error
+            if spatial_size_after_filter == 0:
+                raise ValueError("The spatial dimension 'x' is empty after applying the bounding box filter. "
+                         "Please check the bounding box configuration or data availability.")
+
+        # Create time index to select the appropriate data range
+        try:
+        # Attempt to convert time using pandas directly
+            date_times = pd.to_datetime(self.ds_ecland["time"].values)
+        except Exception as e:
+        # If direct conversion fails, use cftime with units
+            if 'units' in self.ds_ecland["time"].attrs:
+                time_units = self.ds_ecland["time"].attrs["units"]
+                date_times = pd.to_datetime(cftime.num2pydate(self.ds_ecland["time"].values, time_units))
+            else:
+                raise KeyError("The 'time' variable does not have a 'units' attribute and direct conversion failed.")
+
         self.start_index = min(np.argwhere(date_times.year == int(start_yr)))[0]
         self.end_index = max(np.argwhere(date_times.year == int(end_yr)))[0]
         print("Start index", self.start_index)
-        if self.model == 'lstm':
-            self.start_index = self.start_index - self.lookback
-            print("Start index", self.start_index)
+
         self.times = np.array(date_times[self.start_index : self.end_index])
         self.len_dataset = self.end_index - self.start_index
         print("Length of dataset:", self.len_dataset)
 
         # Select points in space
-        print("Use all x_idx from global.")
         self.x_idxs = (0, None) if "None" in x_idxs else x_idxs
         self.x_size = len(self.ds_ecland["x"][slice(*self.x_idxs)])
         self.lats = self.ds_ecland["lat"][slice(*self.x_idxs)]
         self.lons = self.ds_ecland["lon"][slice(*self.x_idxs)]
-
+        print("Spatial size of data set:", self.x_size)
+        print("Spatial indices of data set:", self.x_idxs)
+        
         # If spatial sampling is active, create container with random indices.
         if self.spatial_sample_size is not None:
             print("Activate spatial sampling of x_idxs")
@@ -119,26 +153,29 @@ class EcDataset(Dataset):
         self.variable_size = len(self.dynamic_index) + len(self.targ_index ) + len(self.clim_index)
         
         # Define the statistics used for normalising the data
-        self.x_dynamic_means = tensor(self.ds_ecland.data_means[self.dynamic_index])
-        self.x_dynamic_stdevs = tensor(self.ds_ecland.data_stdevs[self.dynamic_index])
-        self.x_dynamic_maxs = tensor(self.ds_ecland.data_maxs[self.dynamic_index])
-        
-        self.clim_means = tensor(self.ds_ecland.clim_means[self.clim_index])
-        self.clim_stdevs = tensor(self.ds_ecland.clim_stdevs[self.clim_index])
-        self.clim_maxs = tensor(self.ds_ecland.clim_maxs[self.clim_index])
-        
+        self.x_dynamic_means = tensor(self.ds_ecland.data_means.values[self.dynamic_index])
+        self.x_dynamic_stdevs = tensor(self.ds_ecland.data_stdevs.values[self.dynamic_index])
+        self.x_dynamic_maxs = tensor(self.ds_ecland.data_maxs.values[self.dynamic_index])
+
+        self.clim_means = tensor(self.ds_ecland.clim_means.values[self.clim_index])
+        self.clim_stdevs = tensor(self.ds_ecland.clim_stdevs.values[self.clim_index])
+        self.clim_maxs = tensor(self.ds_ecland.clim_maxs.values[self.clim_index])
+
         # Define statistics for normalising the targets
-        self.y_prog_means = tensor(self.ds_ecland.data_means[self.targ_index])
-        self.y_prog_stdevs = tensor(self.ds_ecland.data_stdevs[self.targ_index])
-        self.y_prog_maxs = tensor(self.ds_ecland.data_maxs[self.targ_index])
+        self.y_prog_means = tensor(self.ds_ecland.data_means.values[self.targ_index])
+        self.y_prog_stdevs = tensor(self.ds_ecland.data_stdevs.values[self.targ_index])
+        self.y_prog_maxs = tensor(self.ds_ecland.data_maxs.values[self.targ_index])
 
         # Create time-invariant static climatological features
-        x_static = tensor(
-            self.ds_ecland.clim_data[slice(*self.x_idxs), :]
-        )
+        clim_data = self.ds_ecland.clim_data.values[slice(*self.x_idxs), :]
+        if clim_data.size == 0:
+            raise ValueError("Selected climatological data is empty. Check the slicing indices and data availability.")
+        # Convert the data to a tensor
+        x_static = tensor(clim_data)
+
         x_static = x_static[:, self.clim_index]
         self.x_static_scaled = self.stat_transform(
-            x_static, means = self.clim_means, stds = self.clim_stdevs, maxs = self.clim_maxs
+            x_static, means=self.clim_means, stds=self.clim_stdevs, maxs=self.clim_maxs
         ).reshape(1, self.x_size, -1)
 
     def chunk_indices(self, chunk_size = 2000):
@@ -227,44 +264,46 @@ class EcDataset(Dataset):
         return x
 
     def load_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Load data into memory. **CAUTION ONLY USE WHEN WORKING WITH DATASET THAT FITS
-        IN MEM**
-
-        :return: static_features, dynamic_features, prognostic_targets,
-        diagnostic_targets
-        """
         
-        ds_slice = tensor(
-            self.ds_ecland.data[
-                self.start_index : self.end_index, slice(*self.x_idxs), :
-            ]
-        )
-
-        X = ds_slice[:, :, self.dynamic_index]
-        X = self.dyn_transform(X, means = self.x_dynamic_means, stds = self.x_dynamic_stdevs, maxs = self.x_dynamic_maxs)
-
-        X_static = self.x_static_scaled
-
-        Y_prog = ds_slice[:, :, self.targ_index]
-        Y_prog = self.prog_transform(Y_prog, means = self.y_prog_means, stds = self.y_prog_stdevs, maxs = self.y_prog_maxs)
-
-        if self.model == 'xgb':
-            
-            Y_inc = Y_prog[1:, :, :] - Y_prog[:-1, :, :]
-            
-            return X_static, X[:-1], Y_prog[:-1], Y_inc
-
-        else:
-            
-            if self.targ_diag_index is not None:
-                
-                Y_diag = ds_slice[:, :, self.targ_diag_index]
-                Y_diag = self.diag_transform(Y_diag, means = self.y_diag_means, stds = self.y_diag_stdevs,  maxs = self.y_diag_maxs)
+        """Load data into memory. **CAUTION ONLY USE WHEN WORKING WITH DATASET THAT FITS IN MEM**
     
+        :return: static_features, dynamic_features, prognostic_targets, diagnostic_targets
+        """
+    
+        # Select the relevant slice of data using xarray's isel() for indexes
+        ds_slice = self.ds_ecland.isel(
+            time=slice(self.start_index, self.end_index),  # Using 'time' as the dimension name
+            x=slice(*self.x_idxs)
+        )
+    
+        # Extract dynamic features, convert to numpy array for transformations
+        X = ds_slice['data'].isel(variable=self.dynamic_index).values
+        X = tensor(X)  # Convert to tensor if necessary
+        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
+    
+        # Static features are already precomputed and stored in x_static_scaled
+        X_static = self.x_static_scaled
+    
+        # Extract prognostic targets, convert to numpy array for transformations
+        Y_prog = ds_slice['data'].isel(variable=self.targ_index).values
+        Y_prog = tensor(Y_prog)  # Convert to tensor if necessary
+        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs, maxs=self.y_prog_maxs)
+    
+        # Check the model type and handle increment calculation or diagnostic target selection
+        if self.model == 'xgb':
+            # Calculate increments for XGBoost model
+            Y_inc = Y_prog[1:, :, :] - Y_prog[:-1, :, :]
+            return X_static, X[:-1], Y_prog[:-1], Y_inc
+    
+        else:
+            if self.targ_diag_index is not None:
+                # Extract diagnostic targets, convert to numpy array for transformations
+                Y_diag = ds_slice['data'].isel(variable=self.targ_diag_index).values
+                Y_diag = tensor(Y_diag)  # Convert to tensor if necessary
+                Y_diag = self.diag_transform(Y_diag, means=self.y_diag_means, stds=self.y_diag_stdevs, maxs=self.y_diag_maxs)
                 return X_static, X, Y_prog, Y_diag
     
             else:
-                
                 return X_static, X, Y_prog
             
     # number of rows in the dataset

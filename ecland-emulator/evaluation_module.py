@@ -14,8 +14,7 @@ print(SCRIPT_DIR)
 
 from matplotlib.colors import BoundaryNorm
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
-from utils.visualise import make_ailand_plot, plot_score_map
-from utils.utils import r2_score_multi, anomaly_correlation, standardized_anomaly, get_scores_spatial_global, assemble_scores
+from helpers import r2_score_multi, anomaly_correlation, standardized_anomaly
 
 
 class EvaluationModule:
