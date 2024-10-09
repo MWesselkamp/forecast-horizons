@@ -59,14 +59,17 @@ class ObservationModule:
         soil_temperature = soil_temperature + 273.15
 
         print("Resampling to 6-hourly mean.")
-        station_data_6hr_mean = soil_temperature.resample(time='6h').mean()
-        print(station_data_6hr_mean.head())
-        print("Length of data set:", len(station_data_6hr_mean['time']))
+        self.station_data_6hr_mean = soil_temperature.resample(time='6h').mean()
+        print(self.station_data_6hr_mean.head())
+        print("Length of data set:", len(self.station_data_6hr_mean['time']))
 
         print("Turn into tensor.")
-        station_data_6hr_mean_tensor = torch.tensor(station_data_6hr_mean.values, dtype=torch.float32)
+        station_data_6hr_mean_tensor = torch.tensor(self.station_data_6hr_mean.values, dtype=torch.float32)
 
         return station_data_6hr_mean_tensor
+    
+    def plot_station_data(self):
+        self.station_data_6hr_mean.plot()
 
 
         

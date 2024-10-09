@@ -345,7 +345,7 @@ class EcDataset(Dataset):
     
         # Extract prognostic targets, convert to numpy array for transformations
         Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values)
-        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs, maxs=self.y_prog_maxs)
+        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
     
         # Check the model type and handle increment calculation or diagnostic target selection
         if self.model == 'xgb':
