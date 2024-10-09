@@ -109,67 +109,87 @@ class ForecastModule:
         climatology_std = np.tile(climatology_std, (2, 1, 1))
         return climatology_mu, climatology_std
         
+    def set_initial_conditions(self):
+
+        if self.initial_conditions is None:
+            return self.y_prog[0,...]
+        else:
+            return self.initial_conditions
+        
+    def perturb_prediction(self, original_vector):
+
+        if self.perturbation is not None:
+            return torch.normal(mean=original_vector, std=self.perturbation)
+        else:
+            return original_vector
+
+
+    def set_forcing(self, x_static, x_met, y_prog):
+
+        print(f"Model to device: {self.my_device}")
+
+        self.x_static, self.x_met, self.y_prog = x_static.to(self.my_device), x_met.to(self.my_device), y_prog.to(self.my_device)
+        self.model.to(self.my_device)
+
+    def step_forecast(self):
+        
+        print("Setting model to evaluation mode")
+        self.model.eval()
+        with torch.no_grad():
+                
+            for time_idx in range(self.y_prog_prediction.shape[0]-1):
+                    
+                if time_idx % 1000 == 0:
+                    print(f"on step {time_idx}...")
+
+                logits = self.model.forward(self.x_static, self.x_met[[time_idx]], self.y_prog_prediction[[time_idx]])
+                prediction = self.y_prog_prediction[time_idx, ...] + logits.squeeze()
+                # Perturn only on step after intitialisation
+                prediction = self.perturb_prediction(prediction) if time_idx == 1 else prediction
+                self.y_prog_prediction[time_idx+1, ...] = prediction
     
-    def step_forecast(self, X_static, X_met, Y_prog):
+    def run_forecast(self, initial_conditions = None, perturbation = None):
 
         """
         Args:
             Takes as input the output of self.get_test_data. Suboptimal.
         """
-        
-        if isinstance(self.model, pl.LightningModule):
-            
-            print(f"Model to device: {self.my_device}")
+        self.perturbation = perturbation
+        self.initial_conditions = initial_conditions
 
-            X_static, X_met, Y_prog = X_static.to(self.my_device), X_met.to(self.my_device), Y_prog.to(self.my_device)
-            self.model.to(self.my_device)
+        self.y_prog_prediction = torch.full_like(self.y_prog, float('nan'))
         
-            Y_prog_prediction = Y_prog.clone()
-            
-            print("Setting model to evaluation mode")
-            self.model.eval()
-
-        else:
-            print("Don't know model type.")
-        
+        self.y_prog_prediction[0,...] = self.set_initial_conditions()
+        print("Initialised prediction.")
+    
         start_time = time.time()
+
+        self.step_forecast()
         
-        if self.config['model'] == 'mlp':
-            
-            with torch.no_grad():
-                
-                for time_idx in range(Y_prog_prediction.shape[0]-1):
-                    
-                    if time_idx % 1000 == 0:
-                        print(f"on step {time_idx}...")
-
-                    logits = self.model.forward(X_static, X_met[[time_idx]], Y_prog_prediction[[time_idx]])
-                    Y_prog_prediction[time_idx+1, ...] = Y_prog_prediction[time_idx, ...] + logits.squeeze()
-            
-
         end_time = time.time()
         elapsed_time = end_time - start_time
         print("--- %s seconds ---" % (elapsed_time))
         print("--- %s minutes ---" % (elapsed_time/60))
 
-        print(Y_prog.shape)
-        print(Y_prog_prediction.shape)
+        print("y_prog shape: ",self.y_prog.shape)
+        print("y_prog_prediction shape: ", self.y_prog_prediction.shape)  
         
-        self.dynamic_features = Y_prog
-        self.dynamic_features_prediction = tensor(Y_prog_prediction) if self.config['model'] == 'xgb' else Y_prog_prediction
-                
+        return self.y_prog, self.y_prog_prediction
+    
+    def backtransformation(self):
+        
         print("Backtransforming")
         # make class object for succeeding access.
-        self.dynamic_features_prediction = self.dataset.prog_inv_transform(self.dynamic_features_prediction.cpu(), 
+        y_prog_prediction = self.dataset.prog_inv_transform(self.y_prog_prediction.cpu(), 
                                                                            means = self.dataset.y_prog_means, 
                                                                            stds = self.dataset.y_prog_stdevs, 
                                                                            maxs = self.dataset.y_prog_maxs)
-        self.dynamic_features = self.dataset.prog_inv_transform(self.dynamic_features.cpu(), 
+        y_prog = self.dataset.prog_inv_transform(self.y_prog.cpu(), 
                                                                 means = self.dataset.y_prog_means, 
                                                                 stds = self.dataset.y_prog_stdevs, 
                                                                 maxs = self.dataset.y_prog_maxs)
 
-        return self.dynamic_features, self.dynamic_features_prediction
+        return y_prog, y_prog_prediction
 
     def save_forecast(self, save_to):
         """

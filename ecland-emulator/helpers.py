@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import os
 
 from sklearn.metrics import r2_score
@@ -29,3 +30,14 @@ def anomaly_correlation(forecast, reference, climatology):
     act = np.sqrt(np.mean(anomaly_f**2) * np.mean(anomaly_r**2))
     
     return msse/act
+
+def set_global_seed(seed):
+
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+    
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
