@@ -119,6 +119,8 @@ class ForecastModule:
         
         if isinstance(self.model, pl.LightningModule):
             
+            print(f"Model to device: {self.my_device}")
+
             X_static, X_met, Y_prog = X_static.to(self.my_device), X_met.to(self.my_device), Y_prog.to(self.my_device)
             self.model.to(self.my_device)
         
@@ -158,8 +160,14 @@ class ForecastModule:
                 
         print("Backtransforming")
         # make class object for succeeding access.
-        self.dynamic_features_prediction = self.dataset.prog_inv_transform(self.dynamic_features_prediction.cpu(), means = self.dataset.y_prog_means, stds = self.dataset.y_prog_stdevs, maxs = self.dataset.y_prog_maxs).numpy()
-        self.dynamic_features = self.dataset.prog_inv_transform(self.dynamic_features.cpu(), means = self.dataset.y_prog_means, stds = self.dataset.y_prog_stdevs, maxs = self.dataset.y_prog_maxs).numpy()
+        self.dynamic_features_prediction = self.dataset.prog_inv_transform(self.dynamic_features_prediction.cpu(), 
+                                                                           means = self.dataset.y_prog_means, 
+                                                                           stds = self.dataset.y_prog_stdevs, 
+                                                                           maxs = self.dataset.y_prog_maxs)
+        self.dynamic_features = self.dataset.prog_inv_transform(self.dynamic_features.cpu(), 
+                                                                means = self.dataset.y_prog_means, 
+                                                                stds = self.dataset.y_prog_stdevs, 
+                                                                maxs = self.dataset.y_prog_maxs)
 
         return self.dynamic_features, self.dynamic_features_prediction
 
