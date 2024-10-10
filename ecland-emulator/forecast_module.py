@@ -94,7 +94,10 @@ class ForecastModule(ABC):
     def step_forecast(self):
         
         pass
-    
+
+    def _create_prediction_container(self):
+        return torch.full_like(self.y_prog, float('nan'))
+
     def run_forecast(self, initial_conditions = None, perturbation = None):
 
         """
@@ -104,7 +107,7 @@ class ForecastModule(ABC):
         self.perturbation = perturbation
         self.initial_conditions = initial_conditions
 
-        self.y_prog_prediction = torch.full_like(self.y_prog, float('nan'))
+        self.y_prog_prediction = self._create_prediction_container()
         
         self.y_prog_prediction[0,...] = self.set_initial_conditions()
         print("Initialised prediction.")
@@ -127,11 +130,11 @@ class ForecastModule(ABC):
         
         print("Backtransforming")
         # make class object for succeeding access.
-        y_prog_prediction = self.dataset.prog_inv_transform(self.y_prog_prediction.cpu(), 
+        y_prog_prediction = self.dataset.prog_inv_transform(self.y_prog_prediction, 
                                                                            means = self.dataset.y_prog_means, 
                                                                            stds = self.dataset.y_prog_stdevs, 
                                                                            maxs = self.dataset.y_prog_maxs)
-        y_prog = self.dataset.prog_inv_transform(self.y_prog.cpu(), 
+        y_prog = self.dataset.prog_inv_transform(self.y_prog, 
                                                                 means = self.dataset.y_prog_means, 
                                                                 stds = self.dataset.y_prog_stdevs, 
                                                                 maxs = self.dataset.y_prog_maxs)
@@ -236,3 +239,41 @@ class ForecastModuleLSTM(ForecastModule):
         if self.skip_hindcast:
             self.y_prog_prediction = self.y_prog_prediction[self.model.lookback:, ...]
             self.y_prog = self.y_prog[self.model.lookback:, ...]
+
+class ForecastModuleXGB(ForecastModule):
+
+    def load_model(self):
+
+        print("Set up model: XGB")
+        
+        self.model = xgb.Booster()
+        self.model.load_model(os.path.join(self.config['model_path'], 'xgb_model.bin'))
+
+        return self.model
+    
+    def load_test_data(self, dataset):
+        
+        X_static, X_met, Y_prog, _ = dataset.load_data() 
+        self.dataset = dataset
+
+        return X_static, X_met, Y_prog
+    
+    def set_forcing(self, x_static, x_met, y_prog):
+
+        self.x_static, self.x_met, self.y_prog = x_static.to(self.my_device), x_met.to(self.my_device), y_prog.to(self.my_device)
+
+    def _create_prediction_container(self):
+        return np.full_like(self.y_prog, np.nan)
+    
+    def step_forecast(self):
+        
+        for time_idx in range(self.y_prog_prediction.shape[0]-1):
+                
+            if time_idx % 10 == 0:
+                print(f"on step {time_idx}...")    
+            input_data = np.concatenate((self.x_static, self.x_met[[time_idx]], self.y_prog_prediction[[time_idx]]), axis=-1)
+            input_data = input_data.squeeze(0)
+            step_predictors = xgb.DMatrix(input_data)
+
+            logits = self.model.predict(step_predictors)
+            self.y_prog_prediction[time_idx+1, ...] = self.y_prog_prediction[time_idx, ...] + logits.squeeze()
