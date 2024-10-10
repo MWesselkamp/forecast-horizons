@@ -47,17 +47,8 @@ targets_prog:
   # - tsn
 
 targets_diag:
-  #- d2m
-  #- t2m
-  #- skt
 
-targets_eval:
-  - stl1
-  - stl2
-  - stl3
-
-#file_path: "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i8ki_o200_2010_2022_6h.zarr"
-file_path: "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i6aj_o400_2010_2022_6h_euro.zarr"
+file_path:  "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i6aj_o400_2010_2022_6h_euro.zarr"
 
 start_year: 2015
 end_year: 2019
@@ -65,18 +56,20 @@ end_year: 2019
 validation_start: 2020
 validation_end: 2020
 
-test_start: 2022
-test_end: 2022
+test_start: 2021
+test_end: 2021
 
-x_slice_indices: 4106
+x_slice_indices:
+  - 0
+  - None
 
 spatial_sample_size: # 8000
-bounding_box: # [50, 53, 1.45, 7.75]
+path_to_boundingbox: # "src/data/bounding/bb_europe.nc" # None
 
-dyn_transform: "zscoring"
-stat_transform: "zscoring"
-prog_transform: "zscoring" # "max"
-diag_transform: "zscoring"
+dyn_transform: "identity"
+stat_transform: "identity"
+prog_transform: "identity" # "max"
+diag_transform: "identity"
 
 roll_out: 4  # 4  # 1
 lookback: 0
@@ -84,18 +77,20 @@ lookback: 0
 continue_training: False
 batch_size: 4  # 4  # 4  # 8  # 32
 num_workers: 16  # 8
+hidden_dim: 64  # 128  #90  # 96  #0120
 max_epochs: 220
 strategy: ddp
 devices: 2
-device: cpu
+device:
 
-model: "mlp"
-model_path: "../model/checkpoints" # /checkpoints/last.ckpt
-climatology_path: # "../analyses/climatology_6hrly_southern_england.nc"
+model: "xgb"
+model_path: "src/xgb/results/europe"
+climatology_path: "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"
 
 logging:
    logger: "csv"
-   location: "../results"
-   project: "mlp"
+   location: "src/xgb/results/global/europe"
+  # logger: "mlflow"
+  # uri: "file:./mlruns"
+   project: "xgb"
    name: "europe"
-   region: "gevenich"

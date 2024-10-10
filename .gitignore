@@ -3,6 +3,10 @@ analyses/
 plots/
 results/
 
+ecland-emulator/lstm
+ecland-emulator/mlp
+ecland-emulator/xgb
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
