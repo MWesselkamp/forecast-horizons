@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import os
+import yaml
 
 from sklearn.metrics import r2_score
 
@@ -41,3 +42,21 @@ def set_global_seed(seed):
     
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def load_config(config_path):
+
+    with open(config_path) as stream:
+        try:
+            config = yaml.safe_load(stream)
+            print(f"Opening {config_path} for experiment configuration.")
+        except yaml.YAMLError as exc:
+            print(exc)
+    return config
+
+def load_hpars(use_model):
+
+    with open(os.path.join(use_model, "hparams.yaml"), "r") as stream:
+        hpars = yaml.safe_load(stream)
+    print(hpars)
+    return hpars
+

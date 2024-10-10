@@ -69,22 +69,22 @@ test_end: 2022
 
 x_slice_indices: 4106
 
-spatial_sample_size: # 8000
-bounding_box: # [50, 53, 1.45, 7.75]
+spatial_sample_size:
+bounding_box: 
 
 dyn_transform: "zscoring"
 stat_transform: "zscoring"
 prog_transform: "zscoring" # "max"
 diag_transform: "zscoring"
 
-roll_out: 40  # 4  # 1
+roll_out: 40 
 lookback: 24
 
 continue_training: False
-batch_size: 8  # 4  # 4  # 8  # 32
-num_workers: 16  # 8
-max_epochs: 250 # 450
-strategy: ddp #_find_unused_parameters_true
+batch_size: 1 # For evaluation to 1
+num_workers: 16 
+max_epochs: 250 
+strategy: ddp 
 devices: 4
 device:
 
@@ -95,8 +95,6 @@ climatology_path: # "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.n
 logging:
    logger: "csv"
    location: "../results"
-  # logger: "mlflow"
-  # uri: "file:./mlruns"
    project: "lstm"
    name: "europe"
    region: "gevenich"

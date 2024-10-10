@@ -64,12 +64,22 @@ class ObservationModule:
         print("Length of data set:", len(self.station_data_6hr_mean['time']))
 
         print("Turn into tensor.")
-        station_data_6hr_mean_tensor = torch.tensor(self.station_data_6hr_mean.values, dtype=torch.float32)
+        self.station_data_6hr_mean_tensor = torch.tensor(self.station_data_6hr_mean.values, dtype=torch.float32)
 
-        return station_data_6hr_mean_tensor
+        return self.station_data_6hr_mean_tensor
     
     def plot_station_data(self):
         self.station_data_6hr_mean.plot()
+
+    def transform_station_data(self, dataset, target_variables):
+
+        self.matching_indices = [i for i, val in enumerate(dataset.targ_lst) if val in target_variables]
+        station_data_transformed = dataset.prog_transform(self.station_data_6hr_mean_tensor, 
+                                                          means=dataset.y_prog_means[self.matching_indices], 
+                                                          stds=dataset.y_prog_stdevs[self.matching_indices])
+        
+        return station_data_transformed
+
 
 
         
