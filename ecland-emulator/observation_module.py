@@ -35,20 +35,16 @@ class ObservationModule:
 
         closest_indices = []
         for lat, lon in zip(lat_a, lon_a):
-            print("Get Euclidean Distance.")
-            #Euclidean distance
-            distances = np.sqrt((lat_b - lat)**2 + (lon_b - lon)**2)
-            # closest distance
-            closest_idx = distances.argmin()
+            
+            distances = np.sqrt((lat_b - lat)**2 + (lon_b - lon)**2) #Euclidean distance
+            closest_idx = distances.argmin() # closest distance
             
             closest_indices.append(closest_idx)
-        print("Index of closest grid cell:", closest_indices)
 
-        # select the closest grid cell to station 
-        self.closest_gridcell = self.forcing.isel(x=closest_indices)
-        print(self.closest_gridcell)
+        self.closest_gridcell = self.forcing.isel(x=closest_indices)  # select the closest grid cell to station 
+        print("Matched station with grid cell: ", closest_indices[0])
 
-        return closest_indices
+        return closest_indices[0]
 
     def process_station_data(self, 
                              variable = 'st'):
