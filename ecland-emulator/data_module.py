@@ -19,6 +19,7 @@ import yaml
 import zarr
 from torch import tensor
 from torch.utils.data import DataLoader, Dataset
+from abc import ABC, abstractmethod
 
 #PATH = '../data'
 ## Open up experiment configs
@@ -50,25 +51,23 @@ class EcDataset(Dataset):
         self.rollout=config["roll_out"]
         self.lookback=config["lookback"]
         self.model = config["model"]
+        self.lookback = config["lookback"]
 
         self.dyn_transform, self.dyn_inv_transform = self.select_transform(config["dyn_transform"])
         self.stat_transform, self.stat_inv_transform = self.select_transform(config["stat_transform"])
         self.prog_transform, self.prog_inv_transform = self.select_transform(config["prog_transform"])
         self.diag_transform, self.diag_inv_transform = self.select_transform(config["diag_transform"])
 
-        # Use xarray to open the Zarr store
         self.ds_ecland = xr.open_zarr(path)
 
-        # Apply bounding box filter on space if specified in config
+        # Apply bounding box filter?
         if config['bounding_box'] is not None:
             self._apply_bounding_box_filter(self)
 
         # Create time index to select the appropriate data range
         try:
-        # Attempt to convert time using pandas directly
             date_times = pd.to_datetime(self.ds_ecland["time"].values)
         except Exception as e:
-        # If direct conversion fails, use cftime with units
             if 'units' in self.ds_ecland["time"].attrs:
                 time_units = self.ds_ecland["time"].attrs["units"]
                 date_times = pd.to_datetime(cftime.num2pydate(self.ds_ecland["time"].values, time_units))
@@ -76,8 +75,10 @@ class EcDataset(Dataset):
                 raise KeyError("The 'time' variable does not have a 'units' attribute and direct conversion failed.")
 
         self.start_index = min(np.argwhere(date_times.year == int(start_yr)))[0]
+        self.start_index_lagged = max(np.argwhere(date_times.year == (int(start_yr)-1)))[0] - self.lookback
         self.end_index = max(np.argwhere(date_times.year == int(end_yr)))[0]
         print("Temporal start index", self.start_index, "Temporal end index", self.end_index)
+        print("Temporal lagged start index", self.start_index_lagged)
 
         self.times = np.array(date_times[self.start_index : self.end_index])
         self.len_dataset = self.end_index - self.start_index
@@ -159,13 +160,15 @@ class EcDataset(Dataset):
         print(self.x_static_scaled.shape)
     
     def _initialize_spatial_indices(self):
-        # Helper method to initialize the spatial indices
+        
+        # Decide if we're dealing with single grid cells or slices 
         if isinstance(self.x_idxs, int):
             self._handle_single_grid_cell()
         else:
             self._handle_multiple_grid_cells()
 
     def _handle_single_grid_cell(self):
+
         # Handle the case where x_idxs is a single integer (one grid cell)
         print("Using a single grid cell")
         self.x_size = 1
@@ -173,6 +176,7 @@ class EcDataset(Dataset):
         self.lons = self.ds_ecland["lon"][self.x_idxs]
 
     def _handle_multiple_grid_cells(self):
+
         # Handle the case where x_idxs represents multiple grid cells
         print("Using multiple grid cells")
         self.x_idxs = (0, None) if "None" in self.x_idxs else tuple(self.x_idxs)
@@ -181,13 +185,10 @@ class EcDataset(Dataset):
         self.lons = self.ds_ecland["lon"][slice(*self.x_idxs)]
 
     def _apply_bounding_box_filter(self):
-        # Helper method to apply the bounding box filter
+
         bounding_box = self.config['bounding_box']
-            
-        # Print the bounding box values from the config
         print("Bounding box from config:", bounding_box)
             
-        # Apply the bounding box filter using xarray capabilities
         ds_ecland_idx = self.ds_ecland.x.where(
             (self.ds_ecland.lat > bounding_box[0]) & 
             (self.ds_ecland.lat < bounding_box[1]) & 
@@ -348,20 +349,14 @@ class EcDataset(Dataset):
         Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
     
         # Check the model type and handle increment calculation or diagnostic target selection
-        if self.model == 'xgb':
-            # Calculate increments for XGBoost model
-            Y_inc = Y_prog[1:, :, :] - Y_prog[:-1, :, :]
-            return X_static, X[:-1], Y_prog[:-1], Y_inc
+        if self.targ_diag_index is not None:
+            # Extract diagnostic targets, convert to numpy array for transformations
+            Y_diag = tensor(ds_slice['data'].isel(variable=self.targ_diag_index).values)
+            Y_diag = self.diag_transform(Y_diag, means=self.y_diag_means, stds=self.y_diag_stdevs, maxs=self.y_diag_maxs)
+            return X_static, X, Y_prog, Y_diag
     
         else:
-            if self.targ_diag_index is not None:
-                # Extract diagnostic targets, convert to numpy array for transformations
-                Y_diag = tensor(ds_slice['data'].isel(variable=self.targ_diag_index).values)
-                Y_diag = self.diag_transform(Y_diag, means=self.y_diag_means, stds=self.y_diag_stdevs, maxs=self.y_diag_maxs)
-                return X_static, X, Y_prog, Y_diag
-    
-            else:
-                return X_static, X, Y_prog
+            return X_static, X, Y_prog
             
     def _calculate_effective_length(self):
         return self.len_dataset - 1 - self.rollout
@@ -377,7 +372,9 @@ class EcDataset(Dataset):
     
         return effective_length * size_factor
     
-    # get a row at an index
+
+class EcDatasetMLP(EcDataset):
+
     def __getitem__(self, idx):
 
         # print(f"roll: {self.rollout}, lends: {self.len_dataset}, x_size: {self.x_size}")
@@ -413,46 +410,122 @@ class EcDataset(Dataset):
         # Calculate delta_x update for corresponding x state
         Y_inc = Y_prog[1:,:, :] - Y_prog[:-1, :, :]
         
-        if self.model == 'mlp':
+        if self.targ_diag_index is not None:
             
-            if self.targ_diag_index is not None:
-            
-                Y_diag = ds_slice[:, :, self.targ_diag_index]
-                Y_diag = self.diag_transform(Y_diag,  means = self.y_diag_means, stds = self.y_diag_stdevs,  maxs = self.y_diag_maxs)
-                Y_diag = Y_diag[:-1]
+            Y_diag = ds_slice[:, :, self.targ_diag_index]
+            Y_diag = self.diag_transform(Y_diag,  means = self.y_diag_means, stds = self.y_diag_stdevs,  maxs = self.y_diag_maxs)
+            Y_diag = Y_diag[:-1]
                 
-                return X_static, X[:-1], Y_prog[:-1], Y_inc, Y_diag
-            else:
-                return X_static, X[:-1], Y_prog[:-1], Y_inc
+            return X_static, X[:-1], Y_prog[:-1], Y_inc, Y_diag
+        else:
+            return X_static, X[:-1], Y_prog[:-1], Y_inc
         
-        elif self.model == 'lstm':
+class EcDatasetLSTM(EcDataset):
 
-            X_static_h = X_static[:self.lookback]
-            X_static_f = X_static[self.lookback:(self.lookback + self.rollout)]
-            
-            X_h = X[:self.lookback]
-            X_f = X[self.lookback:(self.lookback + self.rollout)]
+    def _slice_dataset(self):
+
+        # Helper method for flexibility in slicing
+        if isinstance(self.x_idxs, int):
+            print("Select one grid cell from data")
+            return self.ds_ecland.isel(
+                time=slice(self.start_index_lagged, self.end_index),
+                x=self.x_idxs
+            ).expand_dims("x", axis=1)
+        else:
+            print("Select slice from data")
+            return self.ds_ecland.isel(
+                time=slice(self.start_index_lagged, self.end_index),
+                x=slice(*self.x_idxs)
+            )
         
-            Y_prog_h = Y_prog[:self.lookback]
-            Y_prog_f = Y_prog[self.lookback:(self.lookback + self.rollout)]
+    def __getitem__(self, idx):
 
-            Y_inc_h = Y_inc[:self.lookback]
-            Y_inc_f = Y_inc[self.lookback:(self.lookback + self.rollout)]
-            
-            if self.targ_diag_index is not None:
-                
-                Y_diag = ds_slice[:, :, self.targ_diag_index]
-                Y_diag = self.transform(Y_diag, self.y_diag_means, self.y_diag_stdevs)
-                
-                Y_diag_h = Y_diag[:self.lookback]
-                Y_diag_f = Y_diag[self.lookback:self.lookback + self.rollout]
+        # print(f"roll: {self.rollout}, lends: {self.len_dataset}, x_size: {self.x_size}")
+        effective_length = self._calculate_effective_length()
 
-                return X_static_h, X_static_f, X_h, X_f, Y_prog_h, Y_prog_f, Y_diag_h, Y_diag_f
+        t_start_idx = (idx % effective_length) + self.start_index
+        t_end_idx = (idx % effective_length) + self.start_index + self.lookback + self.rollout + 1
+        
+        if self.spatial_sample_size is not None:
+            x_idx = [x + self.x_idxs[0] for x in self.chunked_x_idxs[(idx % self.chunk_size)]]
+        else:
+            x_idx = (idx % self.x_size) + self.x_idxs[0]
+        
+        ds_slice = tensor(
+            self.ds_ecland.data[
+                slice(t_start_idx, t_end_idx), :, :
+            ]
+        )
+        print("x_idx:", x_idx)
+        print("ds_slice shape:", ds_slice.shape)
+        ds_slice = ds_slice[:, x_idx, :]
+        print("ds_slice shape:", ds_slice.shape)
+
+        X = ds_slice[:, :, self.dynamic_index]
+        X = self.dyn_transform(X, means = self.x_dynamic_means, stds = self.x_dynamic_stdevs, maxs = self.x_dynamic_maxs)
+        
+        X_static = self.x_static_scaled.expand(self.rollout+self.lookback, -1, -1)
+        X_static = X_static[:, x_idx, :]
+        
+        Y_prog = ds_slice[:, :, self.targ_index]
+        Y_prog = self.prog_transform(Y_prog, means = self.y_prog_means, stds = self.y_prog_stdevs, maxs = self.y_prog_maxs)
+        
+        Y_inc = Y_prog[1:,:, :] - Y_prog[:-1, :, :] # Calculate delta_x update for corresponding x state
+        
+        X_static_h = X_static[:self.lookback] 
+        X_static_f = X_static[self.lookback:(self.lookback + self.rollout)]
             
-            else:
+        X_h = X[:self.lookback]
+        X_f = X[self.lookback:(self.lookback + self.rollout)]
+        
+        Y_prog_h = Y_prog[:self.lookback]
+        Y_prog_f = Y_prog[self.lookback:(self.lookback + self.rollout)]
+
+        Y_inc_h = Y_inc[:self.lookback]
+        Y_inc_f = Y_inc[self.lookback:(self.lookback + self.rollout)]
+            
+        if self.targ_diag_index is not None:
                 
-                return X_static_h, X_static_f, X_h, X_f, Y_prog_h, Y_prog_f, Y_inc_h, Y_inc_f
+            Y_diag = ds_slice[:, :, self.targ_diag_index]
+            Y_diag = self.transform(Y_diag, self.y_diag_means, self.y_diag_stdevs)
             
+            Y_diag_h = Y_diag[:self.lookback]
+            Y_diag_f = Y_diag[self.lookback:self.lookback + self.rollout]
+                
+            return X_static_h, X_static_f, X_h, X_f, Y_prog_h, Y_prog_f, Y_diag_h, Y_diag_f
+            
+        else:
+                
+            return X_static_h, X_static_f, X_h, X_f, Y_prog_h, Y_prog_f, Y_inc_h, Y_inc_f
+
+class EcDatasetXGB(EcDataset):
+
+    def load_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        
+        """Load data into memory. **CAUTION ONLY USE WHEN WORKING WITH DATASET THAT FITS IN MEM**
+    
+        :return: static_features, dynamic_features, prognostic_targets, diagnostic_targets
+        """
+    
+        ds_slice = self._slice_dataset()
+
+        # Extract dynamic features, convert to numpy array for transformations
+        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
+        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
+    
+        # Static features are already precomputed and stored in x_static_scaled
+        X_static = self.x_static_scaled
+    
+        # Extract prognostic targets, convert to numpy array for transformations
+        Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values)
+        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
+    
+        Y_inc = Y_prog[1:, :, :] - Y_prog[:-1, :, :]
+
+        return X_static, X[:-1], Y_prog[:-1], Y_inc
+    
+
+
 class NonLinRegDataModule(pl.LightningDataModule):
     """Pytorch lightning specific data class."""
     

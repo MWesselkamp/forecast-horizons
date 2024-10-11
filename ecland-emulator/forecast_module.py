@@ -17,6 +17,7 @@ from torch import tensor
 from models import *
 from data_module import *
 from abc import ABC, abstractmethod
+from tests.test_model import *
 
 if torch.cuda.is_available():
     DEVICE = "cuda:0"
@@ -42,19 +43,10 @@ class ForecastModule(ABC):
         else:
             self.my_device = my_device
         
+    @abstractmethod
     def initialise_dataset(self):
 
-        dataset = EcDataset(self.config,
-                    self.config["test_start"],
-                    self.config["test_end"])
-
-        self.input_clim_dim = len(dataset.static_feat_lst)
-        self.input_met_dim = len(dataset.dynamic_feat_lst)
-        self.input_state_dim = len(dataset.targ_lst)
-        self.output_dim = len(dataset.targ_lst)  # Number of output targets
-        self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
-
-        return dataset
+        pass
 
     @abstractmethod 
     def load_model(self):
@@ -63,10 +55,11 @@ class ForecastModule(ABC):
 
     def load_test_data(self, dataset):
         
-        X_static, X_met, Y_prog = dataset.load_data() 
         self.dataset = dataset
+        self.x_static, self.x_met, self.y_prog = self.dataset.load_data() 
+        self._set_forcing()
 
-        return X_static, X_met, Y_prog
+        return self.x_static, self.x_met, self.y_prog 
         
     def set_initial_conditions(self):
 
@@ -83,11 +76,10 @@ class ForecastModule(ABC):
             return original_vector
 
 
-    def set_forcing(self, x_static, x_met, y_prog):
+    def _set_forcing(self):
 
         print(f"Model to device: {self.my_device}")
-
-        self.x_static, self.x_met, self.y_prog = x_static.to(self.my_device), x_met.to(self.my_device), y_prog.to(self.my_device)
+        self.x_static, self.x_met, self.y_prog = self.x_static.to(self.my_device), self.x_met.to(self.my_device), self.y_prog.to(self.my_device)
         self.model.to(self.my_device)
 
     @abstractmethod
@@ -144,6 +136,20 @@ class ForecastModule(ABC):
 
 class ForecastModuleMLP(ForecastModule):
 
+    def initialise_dataset(self):
+
+        dataset = EcDatasetMLP(self.config,
+                    self.config["test_start"],
+                    self.config["test_end"])
+
+        self.input_clim_dim = len(dataset.static_feat_lst)
+        self.input_met_dim = len(dataset.dynamic_feat_lst)
+        self.input_state_dim = len(dataset.targ_lst)
+        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
+
+        return dataset
+    
     def load_model(self):
 
         self.model = MLPregressor(input_clim_dim = self.input_clim_dim,
@@ -193,6 +199,31 @@ class ForecastModuleMLP(ForecastModule):
 
 class ForecastModuleLSTM(ForecastModule):
 
+    def initialise_dataset(self):
+
+        dataset = EcDatasetLSTM(self.config,
+                    self.config["test_start"],
+                    self.config["test_end"])
+
+        self.input_clim_dim = len(dataset.static_feat_lst)
+        self.input_met_dim = len(dataset.dynamic_feat_lst)
+        self.input_state_dim = len(dataset.targ_lst)
+        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
+
+        return dataset
+    
+    def _process_data(self):
+        return self.x_static, self.x_met[self.config["lookback"]:], self.y_prog[self.config["lookback"]:]
+    
+    def load_test_data(self, dataset):
+        
+        self.dataset = dataset
+        self.x_static, self.x_met, self.y_prog = self.dataset.load_data() 
+        self._set_forcing()
+
+        return self._process_data()
+    
     def load_model(self):
 
         print("Set up model")
@@ -231,9 +262,9 @@ class ForecastModuleLSTM(ForecastModule):
 
     def step_forecast(self):
         
-        print("Y_prog_prediction shape:", self.y_prog_prediction.shape)
+        test_forecast_shapes(self.model, self.x_static, self.x_met, self.y_prog) # Test data structures before forecasting
+
         preds = self.model.forecast(self.x_static, self.x_met, self.y_prog)
-        print("LSTM preds shape:", preds.shape)
         self.y_prog_prediction[self.model.lookback:, ...] = preds.squeeze(0)
 
         if self.skip_hindcast:
@@ -242,10 +273,23 @@ class ForecastModuleLSTM(ForecastModule):
 
 class ForecastModuleXGB(ForecastModule):
 
+    def initialise_dataset(self):
+
+        dataset = EcDatasetXGB(self.config,
+                    self.config["test_start"],
+                    self.config["test_end"])
+
+        self.input_clim_dim = len(dataset.static_feat_lst)
+        self.input_met_dim = len(dataset.dynamic_feat_lst)
+        self.input_state_dim = len(dataset.targ_lst)
+        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
+
+        return dataset
+
     def load_model(self):
 
         print("Set up model: XGB")
-        
         self.model = xgb.Booster()
         self.model.load_model(os.path.join(self.config['model_path'], 'xgb_model.bin'))
 
@@ -253,14 +297,14 @@ class ForecastModuleXGB(ForecastModule):
     
     def load_test_data(self, dataset):
         
-        X_static, X_met, Y_prog, _ = dataset.load_data() 
         self.dataset = dataset
+        self.x_static, self.x_met, self.y_prog , _ = dataset.load_data() 
+        self._set_forcing()
 
-        return X_static, X_met, Y_prog
+        return self.x_static, self.x_met, self.y_prog 
     
-    def set_forcing(self, x_static, x_met, y_prog):
-
-        self.x_static, self.x_met, self.y_prog = x_static.to(self.my_device), x_met.to(self.my_device), y_prog.to(self.my_device)
+    def _set_forcing(self):
+        self.x_static, self.x_met, self.y_prog = self.x_static.to(self.my_device), self.x_met.to(self.my_device), self.y_prog.to(self.my_device)
 
     def _create_prediction_container(self):
         return np.full_like(self.y_prog, np.nan)
