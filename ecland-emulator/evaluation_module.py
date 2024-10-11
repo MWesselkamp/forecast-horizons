@@ -134,12 +134,28 @@ class EvaluationModule:
         plt.show()
 
     def rmse(self, x_preds, x_ref, **kwargs):
-        if torch.isnan(x_preds).any() or torch.isnan(x_ref).any():
-            return torch.tensor(float('nan'))
-        else:
-            return root_mean_squared_error(x_preds, x_ref)
+
+        if not isinstance(x_preds, torch.Tensor):
+            x_preds = torch.tensor(x_preds)
+        if not isinstance(x_ref, torch.Tensor):
+            x_ref = torch.tensor(x_ref)
+        
+        if np.isnan(x_preds).any() or np.isnan(x_ref).any():
+           return torch.tensor(float('nan'))
+        
+        return root_mean_squared_error(x_preds, x_ref)
+
 
     def mae(self, x_preds, x_ref, **kwargs):
+
+        if not isinstance(x_preds, torch.Tensor):
+            x_preds = torch.tensor(x_preds)
+        if not isinstance(x_ref, torch.Tensor):
+            x_ref = torch.tensor(x_ref)
+            
+        if np.isnan(x_preds).any() or np.isnan(x_ref).any():
+           return torch.tensor(float('nan'))
+        
         return mean_absolute_error(x_preds, x_ref)
 
     def r2(self, x_preds, x_ref, **kwargs):

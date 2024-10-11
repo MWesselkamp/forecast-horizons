@@ -4,15 +4,19 @@ import numpy as np
 import os
 import sys 
 import torch
+import re
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 class ObservationModule:
 
-    def __init__(self, station = 'soil_TERENO_ISMN_2022.nc'):
+    def __init__(self, station = 'soil_TERENO_ISMN_2022.nc', variable = 'st'):
         
         self.station = station
+        self.variable = variable
+
+        self._process_variable = self._process_temperature if variable == 'st' else self._process_soilmoisture
 
     def load_station(self, 
                      data_path = '/perm/dadf/HSAF_validation/in_situ_data/pre_processed_data/ismn_nc'):
@@ -21,9 +25,16 @@ class ObservationModule:
         self.station_data = xr.open_dataset(os.path.join(data_path,self.station))
 
     def load_forcing(self,
-                     year = "2022",
                     data_path = "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i6aj_o400_2010_2022_6h_euro.zarr"):
         
+        match = re.search(r'\d{4}', self.station)
+
+        if match:
+            year = match.group(0)
+            print(f"Extracted year: {year}")
+        else:
+            print("No year found.")
+
         self.forcing = xr.open_zarr(data_path).data.sel(time=slice(year)).to_dataset()
 
     def match_station_with_forcing(self):
@@ -45,24 +56,29 @@ class ObservationModule:
         print("Matched station with grid cell: ", closest_indices[0])
 
         return closest_indices[0]
-
-    def process_station_data(self, 
-                             variable = 'st'):
-
-        soil_temperature = self.station_data["st"] 
-
+    
+    def _process_temperature(self):
         print("Converting celsius into kelvin")
-        soil_temperature = soil_temperature + 273.15
+        return self.variable_data + 273.15
+    
+    def _process_soilmoisture(self):
+        return self.variable_data 
+
+    def process_station_data(self):
+
+        self.variable_data = self.station_data[self.variable] 
+        self.variable_data = self._process_variable()
 
         print("Resampling to 6-hourly mean.")
-        self.station_data_6hr_mean = soil_temperature.resample(time='6h').mean()
-        print("Length of data set:", len(self.station_data_6hr_mean['time']))
+        self.station_data_6hr_mean = self.variable_data.resample(time='6h').mean()
 
+        print("Length of data set:", len(self.station_data_6hr_mean['time']))
         self.station_data_6hr_mean_tensor = torch.tensor(self.station_data_6hr_mean.values, dtype=torch.float32)
 
         return self.station_data_6hr_mean_tensor
     
     def plot_station_data(self):
+
         self.station_data_6hr_mean.plot()
 
     def transform_station_data(self, dataset, target_variables):

@@ -307,7 +307,7 @@ class ForecastModuleXGB(ForecastModule):
         self.x_static, self.x_met, self.y_prog = self.x_static.to(self.my_device), self.x_met.to(self.my_device), self.y_prog.to(self.my_device)
 
     def _create_prediction_container(self):
-        return np.full_like(self.y_prog, np.nan)
+        return np.full_like(self.y_prog, np.nan, dtype=float)
     
     def step_forecast(self):
         
