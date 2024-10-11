@@ -75,7 +75,7 @@ class EcDataset(Dataset):
                 raise KeyError("The 'time' variable does not have a 'units' attribute and direct conversion failed.")
 
         self.start_index = min(np.argwhere(date_times.year == int(start_yr)))[0]
-        self.start_index_lagged = max(np.argwhere(date_times.year == (int(start_yr)-1)))[0] - self.lookback
+        self.start_index_lagged = max(np.argwhere(date_times.year == (int(start_yr)-1)))[0] - self.lookback # create a lagged time index for lstm
         self.end_index = max(np.argwhere(date_times.year == int(end_yr)))[0]
         print("Temporal start index", self.start_index, "Temporal end index", self.end_index)
         print("Temporal lagged start index", self.start_index_lagged)
@@ -314,7 +314,6 @@ class EcDataset(Dataset):
 
     def _slice_dataset(self):
 
-        # Helper method for flexibility in slicing
         if isinstance(self.x_idxs, int):
             print("Select one grid cell from data")
             return self.ds_ecland.isel(
@@ -424,7 +423,7 @@ class EcDatasetLSTM(EcDataset):
 
     def _slice_dataset(self):
 
-        # Helper method for flexibility in slicing
+        # Overwrite class methods to consider time lag when slicing data.
         if isinstance(self.x_idxs, int):
             print("Select one grid cell from data")
             return self.ds_ecland.isel(
