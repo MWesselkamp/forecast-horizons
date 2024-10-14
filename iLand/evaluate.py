@@ -2,12 +2,12 @@
 import matplotlib.pyplot as plt
 
 from iLand.data import *
+from iLand.evaluation_module import *
 from iLand.visualisations import *
 from iLand.helpers import *
 
-dm = DataModule()
+dm = DataSets()
 measurements, predictions_h100, predictions, measurements_subset = dm.get_data(baumarten_num = [1, 2, 3, 4, 5, 7])
-
 
 # Create some plots of the idealized measurements, the predictions at age 100 and predicted timeseries.
 create_dominant_heights_correlation_plot(measurements_subset, predictions_h100,
@@ -31,49 +31,24 @@ create_predicted_site_indices_plot(measurements_subset,
                                    predictions_h100,
                                    output_file="iLand/plots/predicted_site_indices.pdf")
 
-def get_reference_boundaries(stand_idx, predicted_h0, measured_h0, threshold, spec='piab'):
-    # Print stand index and species for debugging/confirmation
-    print(stand_idx)
-    print(spec)
+species = 'piab'
+stand_idx = 2
+standard = 1
 
-    # Filter the predicted H0 DataFrame for the specified stand ID and only every fifth year
-    predicted_idx = predicted_h0[(predicted_h0['rid'] == stand_idx) & (predicted_h0['age'] % 5 == 0)]
+piab_DM = DataModule(species = 'piab',
+                     stand_idx = 2,
+                     standard = 1)
 
-    # Determine maximum stand age up to which to look up measured site indices
-    maximum_age = min(max(measured_h0['Alter'].unique()), max(predicted_idx['age'].unique()))
-    predicted_idx = predicted_idx[predicted_idx['age'] <= maximum_age]
+piab_DM.process_data_subsets(measurements, predictions)
+piab_DM.create_reference()
+piab_DM.create_reference_standards()
+piab_data = piab_DM.get_results_dataframe()
 
-    # Determine the predicted site index
-    predicted_idx_SI = predicted_idx['site_index'].unique()[0]
-
-    # Filter the measured H0 DataFrame for the appropriate age range
-    measured_h0 = measured_h0[(measured_h0['Alter'] >= 45) & (measured_h0['Alter'] <= maximum_age)]
-
-    # Select the expected measurements based on the predicted site index
-    measured_idx_expected = measured_h0[measured_h0['dGz100'] == predicted_idx_SI]
-
-    # Determine the upper bound
-    # Upper bound is the next site index, but if out of range, it remains the same
-    upper_bound_SI = min(predicted_idx_SI + threshold, measured_h0['dGz100'].max())
-    measured_idx_upper_bound = measured_h0[measured_h0['dGz100'] == upper_bound_SI]
-
-    # Lower bound is the previous site index, but if out of range, it remains the same
-    lower_bound_SI = max(predicted_idx_SI - threshold, measured_h0['dGz100'].min())
-    measured_idx_lower_bound = measured_h0[measured_h0['dGz100'] == lower_bound_SI]
-
-    # Create and return a DataFrame with the results
-    result = pd.DataFrame({
-        'rid': stand_idx,
-        'age': predicted_idx['age'],
-        'h0_predicted': predicted_idx['dominant_height'],
-        'h0_ideal': measured_idx_expected['Ho'].values,
-        'h0_ideal_upper': measured_idx_upper_bound['Ho'].values,
-        'h0_ideal_lower': measured_idx_lower_bound['Ho'].values
-    })
-
-    return result
-
-
+EM = EvaluationModule(piab_data)
+EM.set_quantitative_standard()
+EM.get_horizon_trajectory()
+EM.test_horizon_trajectory()
+piab_horizon = EM.get_extended_results()
 
 def main(predictions, measurements, species_names, threshold=1):
     """

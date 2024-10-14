@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-class DataModule:
+class DataSets:
 
     def __init__(self):
 
@@ -94,35 +94,98 @@ class DataModule:
 
 
 class DataManipulator:
-    def __init__(self, measurements, predictions):
+    def __init__(self, measurements, predictions, species):
         self.measurements = measurements
         self.predictions = predictions
-    def subset_measurements(self, species, min_age=40, max_age=115, new_index=None, site_indices = None):
+        self.species = species
+    def subset_measurements(self, min_age=40, max_age=115, new_index=None):
 
-        query_string = f"species == '{species}' & Alter > {min_age} & Alter < {max_age}"
+        query_string = f"species == '{self.species}' & Alter > {min_age} & Alter < {max_age}"
         if new_index is not None:
             query_string += f" & new_index == '{new_index}'"
-        if site_indices is not None:
-            dGz100_query = " | ".join([f"dGz100 == {val}" for val in site_indices])
-            query_string += f" & ({dGz100_query})"
+        #if site_indices is not None:
+        #    dGz100_query = " | ".join([f"dGz100 == {val}" for val in site_indices])
+        #    query_string += f" & ({dGz100_query})"
 
-        return self.measurements.query(query_string)
+        # make species dataframe subset a class attribute and save possible yield classes
+        self.measurements_subset = self.measurements.query(query_string)
+        self.site_indices = self.measurements_subset.dGz100.unique()
 
-    def subset_predictions(self, species,  min_age=40, max_age=115, plot_index=None, site_index = None):
+        return self.measurements_subset
 
-        query_string = f"species == '{species}' & age > {min_age} & age < {max_age}"
+    def subset_predictions(self, min_age=40, max_age=115, plot_index=None, site_index = None):
+
+        query_string = f"species == '{self.species}' & age > {min_age} & age < {max_age}"
         if plot_index is not None:
             query_string += f" & rid == '{plot_index}'"
         if site_index is not None:
             dGz100_query = " | ".join([f"site_index == {val}" for val in site_index])
             query_string += f" & ({dGz100_query})"
 
-        return self.predictions.query(query_string)
+        self.predictions_subset = self.predictions.query(query_string)
 
-    def select_measurement_yield_class(self, measurements_subset, site_index):
+        return self.predictions_subset
+
+    def select_measurement_site_index(self, measurements_subset, site_index):
         query_string = " | ".join([f"dGz100 == {val}" for val in site_index])
         return measurements_subset.query(query_string)
 
     def select_predictions_plot(self, predictions_subset, plot_index):
         query_string =  f"rid == {plot_index}"
+        print(f"Selected species == {predictions_subset.query(query_string).species.unique()}")
+        print(f"Plot index rid == {plot_index}")
+        print(f"Site index == {predictions_subset.query(query_string).site_index.unique()}")
+
         return predictions_subset.query(query_string)
+    def get_site_index(self, predictions_subset):
+        return predictions_subset.site_index.unique()
+    def filter_predictions_years(self, predictions_subset):
+        predictions_subset_sparse = predictions_subset[predictions_subset['age'] % 5 == 0]
+        return predictions_subset_sparse
+
+class DataModule:
+
+    def __init__(self, species='piab', stand_idx=2, standard=1):
+
+        self.species = species
+        self.stand_idx = stand_idx
+        self.standard = standard
+
+    def process_data_subsets(self, measurements, predictions):
+        print("Process data with DataManipulator.")
+
+        self.dm = DataManipulator(measurements, predictions, species=self.species)
+
+        maximum_age = min(max(measurements['Alter'].unique()), max(predictions['age'].unique()))
+        minimum_age = max(min(measurements['Alter'].unique()), min(predictions['age'].unique()))
+
+        predictions_df = self.dm.subset_predictions(min_age=minimum_age,
+                                               max_age=maximum_age)
+        predictions_df_idx = self.dm.select_predictions_plot(predictions_df, plot_index=self.stand_idx)
+        self.predictions_df_idx_sparse = self.dm.filter_predictions_years(predictions_df_idx)
+        self.idx_site_index = self.dm.get_site_index(self.predictions_df_idx_sparse)
+
+        self.measurement_df = self.dm.subset_measurements(min_age=minimum_age,
+                                                max_age=maximum_age)
+    def create_reference(self):
+        print("Select reference measurement based on predicted site index.")
+        self.reference_measurement = self.dm.select_measurement_site_index(self.measurement_df, site_index=self.idx_site_index)
+    def create_reference_standards(self):
+        print("Select reference standard based on upper and lower bounds, derived from predicted site index.")
+        lower_bound_site_index = max(self.idx_site_index + self.standard, self.dm.site_indices.min())
+        upper_bound_site_index = min(self.idx_site_index + self.standard, self.dm.site_indices.max())
+        self.reference_lower_bound = self.dm.select_measurement_site_index(self.measurement_df, site_index=lower_bound_site_index)
+        self.reference_upper_bound = self.dm.select_measurement_site_index(self.measurement_df, site_index=upper_bound_site_index)
+    def get_results_dataframe(self):
+
+        result = pd.DataFrame({
+            'species':self.species,
+            'stand_idx': self.stand_idx,
+            'age': self.predictions_df_idx_sparse['age'],
+            'h0_predicted': self.predictions_df_idx_sparse['dominant_height'],
+            'h0_ideal': self.reference_measurement['Ho'].values,
+            'h0_ideal_upper': self.reference_upper_bound['Ho'].values,
+            'h0_ideal_lower': self.reference_lower_bound['Ho'].values
+        })
+
+        return result
