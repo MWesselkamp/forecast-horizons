@@ -1,41 +1,20 @@
 # Assuming prepare_data and visualisations are defined in separate Python files
+import matplotlib.pyplot as plt
+
 from iLand.data import *
 from iLand.visualisations import *
 from iLand.helpers import *
 
-measurements, predictions_h100, predictions = get_data(baumarten_num = [1, 2, 3, 4, 5, 7])
+dm = DataModule()
+measurements, predictions_h100, predictions, measurements_subset = dm.get_data(baumarten_num = [1, 2, 3, 4, 5, 7])
 
-# Create a subset data frame of ideal observations that matches BWI site indices
-measurements_subset = pd.DataFrame()
-
-for stand_idx in range(len(predictions_h100)):
-    measurements_stand_idx = measurements[
-                                 (predictions_h100['species'][stand_idx] == measurements['species']) &
-                                 (predictions_h100['site_index'][stand_idx] == measurements['dGz100'])
-                                 ].iloc[:, [1, 2, 5, 16]]
-    measurements_stand_idx['rid'] = predictions_h100['rid'][stand_idx]
-    measurements_subset = pd.concat([measurements_subset, measurements_stand_idx], ignore_index=True)
-
-measurements_subset.to_csv("iLand/data/measurements_subset.csv", index=False)
-print(measurements_subset['species'].unique())
-print(len(measurements_subset['rid'].unique()))
-
-measurements_subset = measurements_subset.sort_values(by='rid')
-predictions_h100 = predictions_h100.sort_values(by='rid')
 
 # Create some plots of the idealized measurements, the predictions at age 100 and predicted timeseries.
 create_dominant_heights_correlation_plot(measurements_subset, predictions_h100,
                                          "iLand/plots/dominant_heights_correlation_h100.pdf")
-create_dominant_height_deviations_plot(predictions_h100, measurements_subset,
-                                       rid_value=2,
-                                       output_file="iLand/plots/reconstructed_SI_boundaries.pdf")
-create_site_index_boundaries_plot(measurements_subset, predictions,
-                                  rid_value=2,
-                                  output_file="iLand/plots/yield_class_boundaries.pdf")
 
-create_site_index_boundaries_plot_new(measurements_subset, predictions,
-                                  rid_value=2,
-                                  output_file="iLand/plots/yield_class_boundaries.pdf")
+create_site_index_boundaries_plot(measurements, predictions, site_index = 10, species='piab',
+                                  save_to="iLand/plots/site_index_forecast.pdf")
 
 create_boundaries_scheme_plot(measurements_subset,
                                   rid_value=2,

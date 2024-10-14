@@ -3,109 +3,130 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-# Function to read data
-def read_data():
-    measurements = pd.read_csv("iLand/data/site_index_dat.csv", sep=",")
-    predictions_h100 = pd.read_csv("iLand/data/stadtwald_testing_results_h100.txt", sep="\s+")
-    predictions = pd.read_csv("iLand/data/stadtwald_testing_results_SI_time_series.txt", sep="\s+")
-    return measurements, predictions_h100, predictions
+class DataModule:
 
-# Function to inspect data
-def inspect_data(measurements, predictions_h100, predictions):
-    print(measurements.describe())
-    print(measurements.head())
-    print(predictions.describe())
-    print(predictions_h100.describe())
-    print(predictions_h100['species'].value_counts())
+    def __init__(self):
 
-# Function to add species full names
-def add_species_fullname(predictions_h100):
-    species_map = {
-        "piab": "Picea \nabies",
-        "abal": "Abies \nalba",
-        "psme": "Pseudotsuga \nmenziesii",
-        "pisy": "Pinus \nsylvestris",
-        "lade": "Larix \ndecidua",
-        "fasy": "Fagus \nsylvatica"
-    }
-    predictions_h100['species_fullname'] = predictions_h100['species'].map(species_map)
-    return predictions_h100
+        self.measurements, self.predictions_h100, self.predictions = self.read_data()
+    def read_data(self):
 
-# Function to subset and add species information to measurements
-def process_measurements(measurements, baumarten_num = [1, 2, 3, 4, 5, 7]):
+        measurements = pd.read_csv("iLand/data/site_index_dat.csv", sep=",")
+        predictions_h100 = pd.read_csv("iLand/data/stadtwald_testing_results_h100.txt", sep="\s+")
+        predictions = pd.read_csv("iLand/data/stadtwald_testing_results_SI_time_series.txt", sep="\s+")
 
-    species_map_num_to_char = {
-        1: "piab",
-        2: "abal",
-        3: "psme",
-        4: "pisy",
-        5: "lade",
-        7: "fasy"
-    }
-    species_map_num_to_fullname = {
-        1: "Picea \nabies",
-        2: "Abies \nalba",
-        3: "Pseudotsuga \nmenziesii",
-        4: "Pinus \nsylvestris",
-        5: "Larix \ndecidua",
-        7: "Fagus \nsylvatica"
-    }
+        return measurements, predictions_h100, predictions
 
-    measurements = measurements[measurements['BArt'].isin(baumarten_num)]
-    measurements = measurements.copy()
-    measurements.loc[:, 'species'] = measurements['BArt'].map(species_map_num_to_char)
-    measurements.loc[:, 'species_fullname'] = measurements['BArt'].map(species_map_num_to_fullname)
+    def inspect_data(self):
 
-    return measurements
+        print("Insepcting data.")
+        print(self.measurements.describe())
+        print(self.measurements.head())
+        print(self.predictions.describe())
+        print(self.predictions_h100.describe())
+        print(self.predictions_h100['species'].value_counts())
 
-# Function to create and save plots
-def create_and_save_plots(predictions_h100, measurements, output_dir="iLand/plots"):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    def add_species_fullname(self, data_frame):
+        print("Add full species name to data_frame.")
+        species_map = {
+            "piab": "Picea \nabies",
+            "abal": "Abies \nalba",
+            "psme": "Pseudotsuga \nmenziesii",
+            "pisy": "Pinus \nsylvestris",
+            "lade": "Larix \ndecidua",
+            "fasy": "Fagus \nsylvatica"
+        }
+        data_frame['species_fullname'] = data_frame['species'].map(species_map)
+        return data_frame
 
-    # Create the first plot
-    plt.figure(figsize=(12, 6))
-    sns.boxplot(data=predictions_h100, y='dominant_height', hue='species_fullname', palette="Set1")
-    plt.xlabel('Species')
-    plt.ylabel('Dominant height [m]')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "predictions_dominant_height_boxplot.pdf"))
-    plt.close()
+    def _select_species_with_index(self, baumarten_num = [1, 2, 3, 4, 5, 7]):
+        print("Select species with index.")
+        self.measurements = self.measurements[self.measurements['BArt'].isin(baumarten_num)]
+    def match_name_with_index(self, baumarten_num):
+        print("Matching name with index.")
+        species_map_num_to_char = {
+            1: "piab",
+            2: "abal",
+            3: "psme",
+            4: "pisy",
+            5: "lade",
+            7: "fasy"
+        }
 
-    # Create the second plot
-    plt.figure(figsize=(12, 6))
-    sns.boxplot(data=measurements, y='Ho', hue='species_fullname', palette="Set1")
-    plt.xlabel('Species')
-    plt.ylabel('Dominant height [m]')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "measurements_dominant_height_boxplot.pdf"))
-    plt.close()
+        self._select_species_with_index(baumarten_num)
+        self.measurements.loc[:, 'species'] = self.measurements['BArt'].map(species_map_num_to_char)#
 
-    # Arrange the plots side by side and save to a PDF file
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-    sns.boxplot(data=predictions_h100, y='dominant_height', hue='species_fullname', palette="Set1", ax=axes[0])
-    sns.boxplot(data=measurements, y='Ho', hue='species_fullname', palette="Set1", ax=axes[1])
-    for ax in axes:
-        ax.set_xlabel('Species')
-        ax.set_ylabel('Dominant height [m]')
-        ax.tick_params(axis='x', rotation=45)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "dominant_heights_boxplots.pdf"))
-    plt.close()
+    def create_ideal_observations(self):
+        print("Create a data frame of ideal observations that matches BWI site indices.")
+        measurements_subset = pd.DataFrame()
 
-# Main function to run the script
-def get_data(baumarten_num = [1, 2, 3, 4, 5, 7]):
+        for stand_idx in range(len(self.predictions_h100)):
+            measurements_stand_idx = self.measurements[
+                                         (self.predictions_h100['species'][stand_idx] == self.measurements['species']) &
+                                         (self.predictions_h100['site_index'][stand_idx] == self.measurements['dGz100'])
+                                         ].iloc[:, [1, 2, 5, 16]]
+            measurements_stand_idx['rid'] = self.predictions_h100['rid'][stand_idx]
+            measurements_subset = pd.concat([measurements_subset, measurements_stand_idx], ignore_index=True)
 
-    measurements, predictions_h100, predictions = read_data()
-    inspect_data(measurements, predictions_h100, predictions)
-    predictions_h100 = add_species_fullname(predictions_h100)
-    measurements = process_measurements(measurements, baumarten_num)
-    create_and_save_plots(predictions_h100, measurements)
+        measurements_subset.to_csv("iLand/data/measurements_subset.csv", index=False)
 
-    return measurements, predictions_h100, predictions
+        print("Species in data set: ", measurements_subset['species'].unique())
+        print("Number of plots in data set: ", len(measurements_subset['rid'].unique()))
 
-#if __name__ == "__main__":
-#
-#    measurements, predictions_h100, predictions = get_data()
+        return measurements_subset
+    def get_data(self, baumarten_num = [1, 2, 3, 4, 5, 7]):
+
+        self.inspect_data()
+        self.match_name_with_index(baumarten_num)
+
+        self.predictions_h100 = self.add_species_fullname(self.predictions_h100)
+        self.measurements = self.add_species_fullname(self.measurements)
+        self.measurements['new_index'] = self.measurements.apply(lambda row: f"{row['BArt']}_{row['dGz100']}", axis=1)
+
+        # create_dominant_heights_boxplots(self.predictions_h100, self.measurements)
+        self.measurements_subset = self.create_ideal_observations()
+
+        self.measurements_subset = self.measurements_subset.sort_values(by='rid')
+        self.predictions_h100 = self.predictions_h100.sort_values(by='rid')
+
+
+
+        return self.measurements, self.predictions_h100, self.predictions, self.measurements_subset
+
+
+class DataManipulator:
+    def __init__(self, measurements, predictions):
+        self.measurements = measurements
+        self.predictions = predictions
+    def subset_measurements(self, species, min_age=40, max_age=115, new_index=None, site_indices = None):
+
+        query_string = f"species == '{species}' & Alter > {min_age} & Alter < {max_age}"
+        if new_index is not None:
+            query_string += f" & new_index == '{new_index}'"
+        if site_indices is not None:
+            dGz100_query = " | ".join([f"dGz100 == {val}" for val in site_indices])
+            query_string += f" & ({dGz100_query})"
+
+        return self.measurements.query(query_string)
+
+    def subset_predictions(self, species,  min_age=40, max_age=115, plot_index=None, site_index = None):
+
+        query_string = f"species == '{species}' & age > {min_age} & age < {max_age}"
+        if plot_index is not None:
+            query_string += f" & rid == '{plot_index}'"
+        if site_index is not None:
+            dGz100_query = " | ".join([f"site_index == {val}" for val in site_index])
+            query_string += f" & ({dGz100_query})"
+
+        return self.predictions.query(query_string)
+
+    def select_measurement_yield_class(self, site_index):
+
+        query_string = " | ".join([f"dGz100 == {val}" for val in site_index])
+
+        self.measurements.query(query_string)
+
+    def select_predictions_yield_class(self, site_index):
+
+        query_string = " | ".join([f"site_index == {val}" for val in site_index])
+
+        self.predictions.query(query_string)

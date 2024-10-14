@@ -3,8 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import tol_colors as tc
+import os
 
-from iLand.data import add_species_fullname
+from iLand.data import *
+from matplotlib import font_manager
+from metrics import absolute_differences
 
 def create_dominant_heights_correlation_plot(measurements_subset, predictions_h100, output_file, width=6, height=6):
 
@@ -63,115 +66,87 @@ def create_dominant_height_deviations_plot(predictions_h100, measurements_subset
     plt.savefig(output_file)
     plt.close()
 
-def create_site_index_boundaries_plot_new(measurements_subset, predictions, rid_value, output_file):
-    # Filter and label the data based on dGz100 values (selection of specific classes)
-    species = measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]
+def create_dominant_heights_boxplots(predictions_h100, measurements, output_dir="iLand/plots"):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    # Filter for specific yield classes (8, 9, 11, 12)
-    df_8 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 8)].copy()
-    df_8['type'] = '8'
-
-    df_9 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 9)].copy()
-    df_9['type'] = '9'
-
-    df_11 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 11)].copy()
-    df_11['type'] = '11'
-
-    df_12 = measurements_subset[(measurements_subset['species'] == species) & (measurements_subset['dGz100'] == 12)].copy()
-    df_12['type'] = '12'
-
-    # Combine the selected dataframes
-    all_lines = pd.concat([df_8, df_9, df_11, df_12])
-
-    plt.figure(figsize=(7, 6))
-
-    # Plot each yield class line
-    for line_type, data in all_lines.groupby('type'):
-        plt.plot(data['Alter'], data['Ho'], label=f'Class {line_type}',
-                 color='lightblue' if line_type in ['8', '12'] else 'blue', linewidth=1)
-
-    # Plot the '10' line from the measurements_subset
-    data_10 = measurements_subset[measurements_subset['rid'] == rid_value]
-    plt.plot(data_10['Alter'], data_10['Ho'], color='black', linewidth=2, label='Class 10')
-
-    # Plot the mean of all predictions across all rid values
-    mean_predictions = predictions.groupby('age')['dominant_height'].mean().reset_index()
-    plt.plot(mean_predictions['age'], mean_predictions['dominant_height'], color='red', linewidth=2, label='Mean y_hat')
-
-    # Add vertical dashed line at x = 100
-    plt.axvline(x=100, color='black', linestyle='--')
-
-    # Customize the legend and labels
-    plt.xlabel('Time [Age]', fontsize=16)
-    plt.ylabel('Dominant height [m]', fontsize=16)
-    plt.xticks(rotation=45, fontsize=12)
-    plt.yticks(fontsize=12)
-
-    # Customize the legend
-    plt.legend(title='Yield class (g)', title_fontsize=16, fontsize=12)
-
-    # Adjust layout and save the plot
+    # Create the first plot
+    plt.figure(figsize=(12, 6))
+    sns.boxplot(data=predictions_h100, y='dominant_height', hue='species_fullname', palette="Set1")
+    plt.xlabel('Species')
+    plt.ylabel('Dominant height [m]')
+    plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(output_file, format='pdf')
+    plt.savefig(os.path.join(output_dir, "predictions_dominant_height_boxplot.pdf"))
+    plt.close()
+
+    # Create the second plot
+    plt.figure(figsize=(12, 6))
+    sns.boxplot(data=measurements, y='Ho', hue='species_fullname', palette="Set1")
+    plt.xlabel('Species')
+    plt.ylabel('Dominant height [m]')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "measurements_dominant_height_boxplot.pdf"))
+    plt.close()
+
+    # Arrange the plots side by side and save to a PDF file
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    sns.boxplot(data=predictions_h100, y='dominant_height', hue='species_fullname', palette="Set1", ax=axes[0])
+    sns.boxplot(data=measurements, y='Ho', hue='species_fullname', palette="Set1", ax=axes[1])
+    for ax in axes:
+        ax.set_xlabel('Species')
+        ax.set_ylabel('Dominant height [m]')
+        ax.tick_params(axis='x', rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "dominant_heights_boxplots.pdf"))
     plt.close()
 
 
-def create_site_index_boundaries_plot(measurements_subset, predictions, rid_value, output_file):
-    # Filter and label the data based on dGz100 values
-    df_8 = measurements_subset[(measurements_subset['species'] ==
-                                measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
-                               (measurements_subset['dGz100'] == 8)].copy()
-    df_8['type'] = '8'
+def create_site_index_boundaries_plot(measurements, predictions, site_index = 10, species = 'piab', save_to  = "site_index_forecast.pdf"):
 
-    df_12 = measurements_subset[(measurements_subset['species'] ==
-                                 measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
-                                (measurements_subset['dGz100'] == 12)].copy()
-    df_12['type'] = '12'
+    fig, axs = plt.subplots(2, 1, figsize=(7, 6),height_ratios=[2, 1],
+                             sharex=True, sharey=False)
 
-    df_9 = measurements_subset[(measurements_subset['species'] ==
-                                measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
-                               (measurements_subset['dGz100'] == 9)].copy()
-    df_9['type'] = '9'
+    measurements_df = measurements.query(f"species == '{species}'")
+    predictions_df = predictions.query(f"species == '{species}' and site_index == {site_index}")
 
-    df_11 = measurements_subset[(measurements_subset['species'] ==
-                                 measurements_subset['species'][measurements_subset['rid'] == rid_value].values[0]) &
-                                (measurements_subset['dGz100'] == 11)].copy()
-    df_11['type'] = '11'
+    for idx in measurements_df['new_index'].unique():
+        measured_yield_class_rho2 = measurements_df.query(
+            f"new_index == '{idx}' & Alter > {40} & Alter < {115} & (dGz100 == {8} | dGz100 == {12})")
+        axs[0].plot(measured_yield_class_rho2['Alter'], measured_yield_class_rho2['Ho'], color="red", linewidth=2.5)
+        measured_yield_class_rho = measurements_df.query(
+            f"new_index == '{idx}' & Alter > {40} & Alter < {115} & (dGz100 == {9} | dGz100 == {11})")
+        axs[0].plot(measured_yield_class_rho['Alter'], measured_yield_class_rho['Ho'], color="salmon", linewidth=2.5)
+        measured_yield_class_rho = measurements_df.query(
+            f"new_index == '{idx}' & Alter > {40} & Alter < {115} & (dGz100 == {7} | dGz100 == {13})")
+        axs[0].plot(measured_yield_class_rho['Alter'], measured_yield_class_rho['Ho'], color="darkred", linewidth=2.5)
+    reference_yield_class = measurements_df.query(f"dGz100 == {10} & Alter > {40} & Alter < {115}")
+    axs[0].plot(reference_yield_class['Alter'], reference_yield_class['Ho'], color="black", label="Reference", linewidth=2.5)
+    bias = []
+    for idx in predictions_df['rid'].unique():
+        predicted_yield_class = predictions_df.query(f"rid == {idx} & age > {40} & age < {115}")
+        predicted_yield_class_sparse = predicted_yield_class[predicted_yield_class['age'] % 5 == 0]
+        bias.append(absolute_differences(predicted_yield_class_sparse['dominant_height'].values, reference_yield_class['Ho'].values))
+        axs[0].plot(predicted_yield_class['age'], predicted_yield_class['dominant_height'], color="blue", linewidth=2.5)
+    axs[0].plot([], [], color="red", label="Standard $\pm n*\\rho$")
+    axs[0].plot([], [], color="blue", label="Forecast")
+    axs[0].axvline(x=100, color='black', linestyle='--')
+    axs[0].set_ylabel('Dominant height [m]', fontsize=16, fontweight = 'bold')
+    axs[0].tick_params(axis='x', labelrotation=45, labelsize=16)
+    axs[0].tick_params(axis='y', labelsize=16)
+    bold_font = font_manager.FontProperties(weight='bold', size=16)
+    axs[0].legend(title=f'Yield class {site_index}', fontsize=14, title_fontproperties=bold_font,
+                  loc = "upper left")
 
-    # Combine all dataframes
-    all_lines = pd.concat([df_8, df_12, df_9, df_11])
+    axs[1].plot(predicted_yield_class_sparse['age'], np.array(bias).transpose(), color = "darkblue", linewidth=2)
+    axs[1].set_xlabel('Time [Age]', fontsize=16, fontweight = 'bold')
+    axs[1].set_ylabel('Absolute error', fontsize=16, fontweight = 'bold')
+    axs[1].tick_params(axis='x', labelrotation=45, labelsize=16)
+    axs[1].tick_params(axis='y', labelsize=16)
 
-    plt.figure(figsize=(7, 6))
-
-    # Plot each group
-    sns.lineplot(data=all_lines, x='Alter', y='Ho', hue='type', linewidth=0.8,
-                 palette={'8': 'lightblue', '12': 'lightblue', '9': 'blue', '11': 'blue'})
-
-    # Plot the '10' line from the measurements_subset
-    sns.lineplot(data=measurements_subset[measurements_subset['rid'] == rid_value], x='Alter', y='Ho', color='black',
-                 linewidth=2, label='10')
-
-    # Plot the predictions line
-    sns.lineplot(data=predictions[predictions['rid'] == rid_value], x='age', y='dominant_height', color='red',
-                 linewidth=2, label='y_hat')
-
-    # Add vertical dashed line at x = 100
-    plt.axvline(x=100, color='black', linestyle='--')
-
-    # Customize the legend and labels
-    plt.xlabel('Time [Age]', fontsize=16)
-    plt.ylabel('Dominant height [m]', fontsize=16)
-    plt.xticks(rotation=45, fontsize=12)
-    plt.yticks(fontsize=12)
-
-    # Customize the legend
-    plt.legend(title='Yield class (g)', title_fontsize=16, fontsize=12)
-
-    # Minimal theme
-    sns.set_theme(style="whitegrid")
-
-    # Save the plot to a file
-    plt.savefig(output_file, format='pdf')
+    plt.tight_layout()
+    plt.savefig(save_to, format='pdf')
     plt.close()
 
 def create_boundaries_scheme_plot(measurements_subset, rid_value, output_file):
@@ -255,7 +230,7 @@ def create_idealized_measurements_timeseries_plot(measurements_subset, predictio
     ).reset_index()
 
     # Filter species list to remove "pisy"
-    measurements_subset = add_species_fullname(measurements_subset)
+    # measurements_subset = add_species_fullname(measurements_subset)
     species_list = measurements_subset['species'].unique()
     species_list = [species for species in species_list if species != 'pisy']
     species_names = [species for species in measurements_subset['species_fullname'].unique() if species != "Pinus \nsylvestris"]
