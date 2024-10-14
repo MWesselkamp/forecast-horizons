@@ -23,28 +23,38 @@ class RickerPredation(nn.Module):
         return cls(initial_conditions, params, forcing_params, noise=None)
     def _initialize_parameters(self, params, noise):
         """Initialize model parameters with optional noise."""
-        param_list = params + [noise] if noise is not None else params
+        if noise is not None:
+            params['sigma'] = noise  # Add noise to the dictionary
 
-        # Convert the list to a tensor and ensure it's independent with gradient tracking enabled
-        param_tensor = torch.tensor(param_list, dtype=torch.double).clone().detach().requires_grad_(True)
+        # Convert the parameter dictionary values to tensors and ensure they are independent with gradient tracking enabled
+        param_dict = {key: torch.tensor(value, dtype=torch.double).clone().detach().requires_grad_(True)
+                      for key, value in params.items()}
 
-        return torch.nn.Parameter(param_tensor)
+        # Create torch.nn.Parameter for each tensor
+        param_dict = {key: torch.nn.Parameter(tensor) for key, tensor in param_dict.items()}
+
+        return nn.ParameterDict(param_dict)
 
     def forward(self, forcing):
         """Forward pass to compute the model's output based on forcing input."""
-        params = self._unpack_parameters()
-        return self._compute_dynamics(forcing, params)
-
-    def _unpack_parameters(self):
-        """Unpack parameters for easier readability."""
-        if self.noise is not None:
-            return self.model_params[:10], self.model_params[10]
-        return self.model_params[:10], None
+        return self._compute_dynamics(forcing, self.model_params)
 
     def _compute_dynamics(self, forcing, params):
         """Compute the population dynamics."""
 
-        (alpha1, beta1, gamma1, bx1, cx1, alpha2, beta2, gamma2, bx2, cx2), sigma = params
+        # Unpack the model parameters
+        alpha1 = params['alpha1']
+        beta1 = params['beta1']
+        gamma1 = params['gamma1']
+        bx1 = params['bx1']
+        cx1 = params['cx1']
+        alpha2 = params['alpha2']
+        beta2 = params['beta2']
+        gamma2 = params['gamma2']
+        bx2 = params['bx2']
+        cx2 = params['cx2']
+        sigma = params.get('sigma', None)  # sigma might not always be present
+
         sigma_forcing = 0.08
 
         forcing = forcing.squeeze()
@@ -202,7 +212,7 @@ class RickerPredation(nn.Module):
 
         return lyapunov_exponent.item()  # Convert to Python float
 
-    def plot_time_series(self, observations_dict, series_name):
+    def plot_time_series(self, observations_dict, series_name, climatology = None):
         """
         Plot the specified time series from the observations dictionary.
 
@@ -222,6 +232,8 @@ class RickerPredation(nn.Module):
             series_data = series_data.transpose()
 
         plt.figure(figsize=(10, 5))
+        if not climatology is None:
+            plt.plot(climatology, color = "lightgray", alpha = 0.8)
         plt.plot(series_data, label=series_name)
         plt.title(f"Time Series: {series_name}")
         plt.xlabel("Time")

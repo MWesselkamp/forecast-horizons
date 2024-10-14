@@ -1,4 +1,6 @@
+import random
 import numpy as np
+import torch
 import os
 from datetime import datetime
 def create_scenario_folder(directory_path, new_folder_name):
@@ -59,3 +61,18 @@ def compute_autocorrelation(time_series):
     autocorrelation_lag1 = numerator / denominator
 
     return autocorrelation_lag1
+def set_seed(seed):
+    # Set seed for random
+    random.seed(seed)
+
+    # Set seed for NumPy
+    np.random.seed(seed)
+
+    # Set seed for PyTorch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)  # if using CUDA
+    torch.cuda.manual_seed_all(seed)  # if using multiple GPUs
+
+    # For deterministic behavior in PyTorch
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
