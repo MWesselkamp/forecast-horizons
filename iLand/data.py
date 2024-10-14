@@ -119,14 +119,10 @@ class DataManipulator:
 
         return self.predictions.query(query_string)
 
-    def select_measurement_yield_class(self, site_index):
-
+    def select_measurement_yield_class(self, measurements_subset, site_index):
         query_string = " | ".join([f"dGz100 == {val}" for val in site_index])
+        return measurements_subset.query(query_string)
 
-        self.measurements.query(query_string)
-
-    def select_predictions_yield_class(self, site_index):
-
-        query_string = " | ".join([f"site_index == {val}" for val in site_index])
-
-        self.predictions.query(query_string)
+    def select_predictions_plot(self, predictions_subset, plot_index):
+        query_string =  f"rid == {plot_index}"
+        return predictions_subset.query(query_string)

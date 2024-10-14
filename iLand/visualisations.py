@@ -103,29 +103,34 @@ def create_dominant_heights_boxplots(predictions_h100, measurements, output_dir=
     plt.close()
 
 
-def create_site_index_boundaries_plot(measurements, predictions, site_index = 10, species = 'piab', save_to  = "site_index_forecast.pdf"):
+def create_site_index_boundaries_plot(measurements, predictions, site_index = 10, species = 'piab',
+                                      save_to  = "site_index_forecast.pdf"):
 
     fig, axs = plt.subplots(2, 1, figsize=(7, 6),height_ratios=[2, 1],
                              sharex=True, sharey=False)
 
-    measurements_df = measurements.query(f"species == '{species}'")
-    predictions_df = predictions.query(f"species == '{species}' and site_index == {site_index}")
+    dm = DataManipulator(measurements, predictions)
+    measurements_df = dm.subset_measurements(species, min_age=40, max_age=115)
+    predictions_df = dm.subset_predictions(species, min_age=40, max_age=115, site_index = [site_index])
 
-    for idx in measurements_df['new_index'].unique():
-        measured_yield_class_rho2 = measurements_df.query(
-            f"new_index == '{idx}' & Alter > {40} & Alter < {115} & (dGz100 == {8} | dGz100 == {12})")
-        axs[0].plot(measured_yield_class_rho2['Alter'], measured_yield_class_rho2['Ho'], color="red", linewidth=2.5)
-        measured_yield_class_rho = measurements_df.query(
-            f"new_index == '{idx}' & Alter > {40} & Alter < {115} & (dGz100 == {9} | dGz100 == {11})")
-        axs[0].plot(measured_yield_class_rho['Alter'], measured_yield_class_rho['Ho'], color="salmon", linewidth=2.5)
-        measured_yield_class_rho = measurements_df.query(
-            f"new_index == '{idx}' & Alter > {40} & Alter < {115} & (dGz100 == {7} | dGz100 == {13})")
-        axs[0].plot(measured_yield_class_rho['Alter'], measured_yield_class_rho['Ho'], color="darkred", linewidth=2.5)
-    reference_yield_class = measurements_df.query(f"dGz100 == {10} & Alter > {40} & Alter < {115}")
+    measured_yield_class_rho3 = dm.select_measurement_yield_class(measurements_df, site_index = [7,13])
+    measured_yield_class_rho2 = dm.select_measurement_yield_class(measurements_df, site_index = [8,12])
+    measured_yield_class_rho1 = dm.select_measurement_yield_class(measurements_df, site_index = [9,11])
+
+    grouped_df = measured_yield_class_rho2.groupby('dGz100')
+    for name, group in grouped_df:
+        axs[0].plot(group['Alter'], group['Ho'], color="red", linewidth=2.5)
+    grouped_df = measured_yield_class_rho1.groupby('dGz100')
+    for name, group in grouped_df:
+        axs[0].plot(group['Alter'], group['Ho'], color="salmon", linewidth=2.5)
+    grouped_df = measured_yield_class_rho3.groupby('dGz100')
+    for name, group in grouped_df:
+        axs[0].plot(group['Alter'], group['Ho'], color="darkred", linewidth=2.5)
+    reference_yield_class = measurements_df.query(f"dGz100 == {site_index}")
     axs[0].plot(reference_yield_class['Alter'], reference_yield_class['Ho'], color="black", label="Reference", linewidth=2.5)
     bias = []
     for idx in predictions_df['rid'].unique():
-        predicted_yield_class = predictions_df.query(f"rid == {idx} & age > {40} & age < {115}")
+        predicted_yield_class = dm.select_predictions_plot(predictions_df, idx)
         predicted_yield_class_sparse = predicted_yield_class[predicted_yield_class['age'] % 5 == 0]
         bias.append(absolute_differences(predicted_yield_class_sparse['dominant_height'].values, reference_yield_class['Ho'].values))
         axs[0].plot(predicted_yield_class['age'], predicted_yield_class['dominant_height'], color="blue", linewidth=2.5)
