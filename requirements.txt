@@ -13,4 +13,5 @@ seaborn==0.13.2
 torch==2.4.0
 torchmetrics==1.4.0.post0
 xarray==2024.7.0
+xgboost==2.0.3
 zarr==2.18.2

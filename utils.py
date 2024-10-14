@@ -33,7 +33,7 @@ def sample_ensemble_member(ensemble):
     ensemble = np.delete(ensemble, index, axis=0)
 
     return control, ensemble, index
-
+    
 
 def compute_autocorrelation(time_series):
     """
