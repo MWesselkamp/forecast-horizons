@@ -95,17 +95,20 @@ class DataSets:
 
 class DataManipulator:
     def __init__(self, measurements, predictions, species):
-        self.measurements = measurements
-        self.predictions = predictions
+
         self.species = species
+
+        self.measurements = self.species_subsets(measurements)
+        self.predictions = self.species_subsets(predictions)
+
+    def species_subsets(self, dataframe):
+        query_string = f"species == '{self.species}'"
+        return dataframe.query(query_string)
     def subset_measurements(self, min_age=40, max_age=115, new_index=None):
 
         query_string = f"species == '{self.species}' & Alter > {min_age} & Alter < {max_age}"
         if new_index is not None:
             query_string += f" & new_index == '{new_index}'"
-        #if site_indices is not None:
-        #    dGz100_query = " | ".join([f"dGz100 == {val}" for val in site_indices])
-        #    query_string += f" & ({dGz100_query})"
 
         # make species dataframe subset a class attribute and save possible yield classes
         self.measurements_subset = self.measurements.query(query_string)
@@ -156,9 +159,10 @@ class DataModule:
 
         self.dm = DataManipulator(measurements, predictions, species=self.species)
 
-        maximum_age = min(max(measurements['Alter'].unique()), max(predictions['age'].unique()))
-        minimum_age = max(min(measurements['Alter'].unique()), min(predictions['age'].unique()))
-
+        maximum_age = min(max(self.dm.measurements['Alter'].unique()), max(self.dm.predictions['age'].unique()))
+        minimum_age = max(min(self.dm.measurements['Alter'].unique()), min(self.dm.predictions['age'].unique()))
+        print("Minimum age: ", minimum_age)
+        print("Maximum age: ", maximum_age)
         predictions_df = self.dm.subset_predictions(min_age=minimum_age,
                                                max_age=maximum_age)
         predictions_df_idx = self.dm.select_predictions_plot(predictions_df, plot_index=self.stand_idx)
@@ -172,14 +176,18 @@ class DataModule:
         self.reference_measurement = self.dm.select_measurement_site_index(self.measurement_df, site_index=self.idx_site_index)
     def create_reference_standards(self):
         print("Select reference standard based on upper and lower bounds, derived from predicted site index.")
-        lower_bound_site_index = max(self.idx_site_index + self.standard, self.dm.site_indices.min())
-        upper_bound_site_index = min(self.idx_site_index + self.standard, self.dm.site_indices.max())
-        self.reference_lower_bound = self.dm.select_measurement_site_index(self.measurement_df, site_index=lower_bound_site_index)
-        self.reference_upper_bound = self.dm.select_measurement_site_index(self.measurement_df, site_index=upper_bound_site_index)
+        print("self.idx_site_index site index: ", self.idx_site_index[0] )
+        lower_bound_site_index = max(self.idx_site_index[0] - self.standard, self.dm.site_indices.min())
+        print("Lower bound site index: ", lower_bound_site_index)
+        upper_bound_site_index = min(self.idx_site_index[0] + self.standard, self.dm.site_indices.max())
+        print("Upper bound site index: ", upper_bound_site_index)
+        self.reference_lower_bound = self.dm.select_measurement_site_index(self.measurement_df, site_index=[lower_bound_site_index])
+        self.reference_upper_bound = self.dm.select_measurement_site_index(self.measurement_df, site_index=[upper_bound_site_index])
     def get_results_dataframe(self):
 
         result = pd.DataFrame({
             'species':self.species,
+            'species_fullname': self.reference_measurement.species_fullname.unique()[0],
             'stand_idx': self.stand_idx,
             'age': self.predictions_df_idx_sparse['age'],
             'h0_predicted': self.predictions_df_idx_sparse['dominant_height'],

@@ -501,7 +501,7 @@ def plot_age_limit_by_species(result_df, output_file):
     # Loop through each row in the result DataFrame
     for index, row in result_df.iterrows():
         species = row['species_fullname']
-        mean_age = row['mean_age']
+        mean_age = row['age']
         plus_sd_age = row['plus_sd_age']
         minus_sd_age = row['minus_sd_age']
 
@@ -542,55 +542,32 @@ def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
     """
     fig, ax = plt.subplots(figsize=(8, 7))
 
-    # Define markers and colors to differentiate between species
-    markers = ['o', 's', '^', 'D', '*']  # Marker styles for different species
-    cmap = tc.tol_cmap('light')  # Extract 5 colors from the "Set1" colormap
+    cmap = tc.tol_cmap('light')
     colors = cmap(np.linspace(0.2, 1, 5))
-    species_names = result_dfs[0]['species_fullname'].unique()  # Get unique species names from the first DataFrame
+    species_names = result_dfs['species_fullname'].unique()
 
-    # Create a plot for each species across the DataFrames
     for species_idx, species in enumerate(species_names):
-        mean_ages = []
-        lower_bounds = []
-        upper_bounds = []
 
-        # Gather mean ages and errors for this species across all DataFrames
-        for i, result_df in enumerate(result_dfs):
-            species_data = result_df[result_df['species_fullname'] == species]
-            if not species_data.empty:
-                mean_age = species_data['mean_age'].values[0]
-                plus_sd_age = species_data['plus_sd_age'].values[0]
-                minus_sd_age = species_data['minus_sd_age'].values[0]
+        species_data = result_dfs.query(f"species_fullname == {repr(species)}")
 
-                lower_bound = mean_age - minus_sd_age if not pd.isna(minus_sd_age) else mean_age
-                upper_bound = mean_age + plus_sd_age if not pd.isna(plus_sd_age) else mean_age
-
-                mean_ages.append(mean_age)
-                lower_bounds.append(lower_bound)
-                upper_bounds.append(upper_bound)
-
-        # Plot the mean ages connected by lines for the current species
-        x_values = list(range(1, len(mean_ages) + 1))  # DataFrame numbers (1, 2, 3, ...)
+        x_values =  thresholds #list(range(1, len(species_data['mean_age'].values) + 1))
         ax.hlines(y=110, xmin=min(x_values), xmax=max(x_values), linestyles="--",
                   color="black", linewidth=1.3)
         ax.hlines(y=45, xmin=min(x_values), xmax=max(x_values), linestyles="--",
                   color="black", linewidth=1.3)
-        ax.plot(x_values, mean_ages, marker=markers[species_idx % len(markers)],
+        ax.plot(x_values, species_data['mean_age'].values,
                 color=colors[species_idx], label=species,
                 markersize=10, linewidth=2.6, alpha=0.9)
         # Add filled confidence intervals for the current species
         # ax.fill_between(x_values, lower_bounds, upper_bounds, color=colors[species_idx], alpha=0.2)
 
     # Customize the plot appearance
-    ax.set_xticks(range(1, len(thresholds) + 1))  # Set x-axis ticks for DataFrame numbers
-    ax.set_xticklabels([f'{t}' for t in thresholds], fontsize=18)  # Set the threshold labels
+    #ax.set_xticks(range(1, len(thresholds) + 1))  # Set x-axis ticks for DataFrame numbers
+    #ax.set_xticklabels([f'{t}' for t in thresholds], fontsize=18)  # Set the threshold labels
     ax.set_xlabel('$\\rho$ [m]', fontsize=18)
     ax.set_ylabel('Forecast horizon [Age]', fontsize=18)
     ax.tick_params(axis='both', labelsize=18)
 
-    # Move the legend to the top
-    #ax.legend(fontsize=12, title='Species', title_fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=3)
     plt.tight_layout()
-    # Save the plot
     plt.savefig(output_file, format='pdf')
     plt.close()
