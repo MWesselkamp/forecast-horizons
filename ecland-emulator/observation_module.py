@@ -11,10 +11,14 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 class ObservationModule:
 
-    def __init__(self, station = 'soil_TERENO_ISMN_2022.nc', variable = 'st'):
+    def __init__(self, network = 'soil_TERENO_ISMN_2022.nc', station = None, variable = 'st', depth = None):
         
+        self.network = network
         self.station = station
         self.variable = variable
+        self.depth = depth
+
+        self.network_name = self.network.split('_')[1]
 
         self._process_variable = self._process_temperature if variable == 'st' else self._process_soilmoisture
 
@@ -22,12 +26,18 @@ class ObservationModule:
                      data_path = '/perm/dadf/HSAF_validation/in_situ_data/pre_processed_data/ismn_nc'):
 
         # Load measurements from one soil data station
-        self.station_data = xr.open_dataset(os.path.join(data_path,self.station))
+        self.network_data = xr.open_dataset(os.path.join(data_path,self.network))
+        if self.station is not None:
+            print("Select station: ", self.station)
+            self.network_data = self.network_data.sel(station_id = [self.station])
+        if self.depth is not None:
+            print("Select depth: ", self.depth)
+            self.network_data = self.network_data.sel(depth = self.depth)
 
     def load_forcing(self,
                     data_path = "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i6aj_o400_2010_2022_6h_euro.zarr"):
         
-        match = re.search(r'\d{4}', self.station)
+        match = re.search(r'\d{4}', self.network)
 
         if match:
             year = match.group(0)
@@ -39,9 +49,9 @@ class ObservationModule:
 
     def match_station_with_forcing(self):
 
-        lat_a = self.station_data.lat.values  
+        lat_a = self.network_data.lat.values  
         lat_b = self.forcing.lat.values 
-        lon_a = self.station_data.lon.values  
+        lon_a = self.network_data.lon.values  
         lon_b = self.forcing.lon.values 
 
         closest_indices = []
@@ -66,7 +76,7 @@ class ObservationModule:
 
     def process_station_data(self):
 
-        self.variable_data = self.station_data[self.variable] 
+        self.variable_data = self.network_data[self.variable] 
         self.variable_data = self._process_variable()
 
         print("Resampling to 6-hourly mean.")
@@ -77,9 +87,11 @@ class ObservationModule:
 
         return self.station_data_6hr_mean_tensor
     
-    def plot_station_data(self):
+    def plot_station_data(self, save_to):
 
         self.station_data_6hr_mean.plot()
+        plt.savefig(os.path.join(save_to, f'{self.network_name}_image_plot.pdf'))
+        plt.show()
 
     def transform_station_data(self, dataset, target_variables):
 

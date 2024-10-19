@@ -59,4 +59,3 @@ def load_hpars(use_model):
         hpars = yaml.safe_load(stream)
     print(hpars)
     return hpars
-
