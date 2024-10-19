@@ -3,12 +3,7 @@ Script contains a class for forecasting with each emulator type.
 """
 import numpy as np
 import os
-import pandas as pd
-import pytorch_lightning as pl
 import torch
-import random
-import xarray as xr
-import re
 import xgboost as xgb
 import time
 import torch
@@ -320,4 +315,7 @@ class ForecastModuleXGB(ForecastModule):
             step_predictors = xgb.DMatrix(input_data)
 
             logits = self.model.predict(step_predictors)
-            self.y_prog_prediction[time_idx+1, ...] = self.y_prog_prediction[time_idx, ...] + logits.squeeze()
+            prediction = self.y_prog_prediction[time_idx, ...] + logits.squeeze()
+            # Perturn only on step after intitialisation
+            prediction = self.perturb_prediction(prediction) if time_idx == 1 else prediction
+            self.y_prog_prediction[time_idx+1, ...] = prediction
