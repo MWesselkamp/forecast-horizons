@@ -304,6 +304,13 @@ class ForecastModuleXGB(ForecastModule):
     def _create_prediction_container(self):
         return np.full_like(self.y_prog, np.nan, dtype=float)
     
+    def perturb_prediction(self, original_vector):
+
+        if self.perturbation is not None:
+            return np.random.normal(loc=original_vector, scale=self.perturbation)
+        else:
+            return original_vector
+    
     def step_forecast(self):
         
         for time_idx in range(self.y_prog_prediction.shape[0]-1):
