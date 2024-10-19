@@ -49,7 +49,7 @@ class EvaluationModule:
     def set_samples(self, observations, fc_numerical, fc_emulator):
 
         self.observations = observations
-        self.fc_numerical = fc_numerical['mlp']
+        self.fc_numerical = fc_numerical
         self.fc_emulator = fc_emulator
 
     def subset_samples(self):

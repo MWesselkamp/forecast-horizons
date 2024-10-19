@@ -59,20 +59,3 @@ def load_hpars(use_model):
         hpars = yaml.safe_load(stream)
     print(hpars)
     return hpars
-
-def setup_experiment(model):
-
-    if model == 'mlp':
-        CONFIG = load_config(config_path = '../../configs/mlp_emulator.yaml')
-        HPARS = load_hpars(use_model = '../mlp')
-        ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG)    
-    elif model == 'lstm':
-        CONFIG = load_config(config_path = '../../configs/lstm_emulator.yaml')
-        HPARS = load_hpars(use_model = '../lstm')
-        ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG)
-    elif model == 'xgb':
-        CONFIG = load_config(config_path = '../../configs/xgb_emulator.yaml')
-        HPARS = None
-        ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG)
-
-    return CONFIG, HPARS, ForecastModel
