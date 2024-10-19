@@ -106,7 +106,7 @@ class DataManipulator:
         return dataframe.query(query_string)
     def subset_measurements(self, min_age=40, max_age=115, new_index=None):
 
-        query_string = f"species == '{self.species}' & Alter > {min_age} & Alter < {max_age}"
+        query_string = f"species == '{self.species}' & Alter >= {min_age} & Alter <= {max_age}"
         if new_index is not None:
             query_string += f" & new_index == '{new_index}'"
 
@@ -118,7 +118,7 @@ class DataManipulator:
 
     def subset_predictions(self, min_age=40, max_age=115, plot_index=None, site_index = None):
 
-        query_string = f"species == '{self.species}' & age > {min_age} & age < {max_age}"
+        query_string = f"species == '{self.species}' & age >= {min_age} & age <= {max_age}"
         if plot_index is not None:
             query_string += f" & rid == '{plot_index}'"
         if site_index is not None:
