@@ -266,6 +266,8 @@ class ForecastModuleLSTM(ForecastModule):
     def handle_hindcast(self, skip = True):
         if skip:
             return self.y_prog[self.model.lookback:, ...], self.y_prog_prediction[self.model.lookback:, ...]
+        else:
+            return self.y_prog, self.y_prog_prediction
 
     def step_forecast(self):
         
