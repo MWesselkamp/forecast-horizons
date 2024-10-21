@@ -56,16 +56,23 @@ class ForecastModule(ABC):
 
         return self.x_static, self.x_met, self.y_prog 
         
-    def set_initial_conditions(self):
+    def _set_initial_conditions(self):
 
         if self.initial_conditions is None:
             return self.y_prog[0,...]
         else:
             return self.initial_conditions
         
-    def perturb_prediction(self, original_vector):
+    def _perturb_initial_conditions(self):
 
-        if self.perturbation is not None:
+        if self.initial_conditions_perturbation is not None:
+            return torch.normal(mean=self.initial_conditions, std=self.initial_conditions_perturbation)
+        else:
+            return self.initial_conditions
+        
+    def _perturb_prediction(self, original_vector):
+
+        if self.predictions_perturbation is not None:
             return torch.normal(mean=original_vector, std=self.perturbation)
         else:
             return original_vector
@@ -85,18 +92,22 @@ class ForecastModule(ABC):
     def _create_prediction_container(self):
         return torch.full_like(self.y_prog, float('nan'))
 
-    def run_forecast(self, initial_conditions = None, perturbation = None):
+    def run_forecast(self, 
+                     initial_conditions = None,
+                     initial_conditions_perturbation = None,
+                     predictions_perturbation = None):
 
         """
         Args:
             Takes as input the output of self.get_test_data. Suboptimal.
         """
-        self.perturbation = perturbation
+        self.predictions_perturbation = predictions_perturbation
+        self.initial_conditions_perturbation = initial_conditions_perturbation
         self.initial_conditions = initial_conditions
 
         self.y_prog_prediction = self._create_prediction_container()
-        
-        self.y_prog_prediction[0,...] = self.set_initial_conditions()
+        self.y_prog_prediction[0,...] = self._set_initial_conditions()
+        self.y_prog_prediction[0,...] = self._perturb_initial_conditions()
         print("Initialised prediction.")
     
         start_time = time.time()
@@ -188,7 +199,7 @@ class ForecastModuleMLP(ForecastModule):
                 logits = self.model.forward(self.x_static, self.x_met[[time_idx]], self.y_prog_prediction[[time_idx]])
                 prediction = self.y_prog_prediction[time_idx, ...] + logits.squeeze()
                 # Perturn only on step after intitialisation
-                prediction = self.perturb_prediction(prediction) if time_idx == 1 else prediction
+                prediction = self._perturb_prediction(prediction) if time_idx == 1 else prediction
                 self.y_prog_prediction[time_idx+1, ...] = prediction
 
 
@@ -253,7 +264,8 @@ class ForecastModuleLSTM(ForecastModule):
         return self.model
     
     def handle_hindcast(self, skip = True):
-        self.skip_hindcast = skip
+        if skip:
+            return self.y_prog[self.model.lookback:, ...], self.y_prog_prediction[self.model.lookback:, ...]
 
     def step_forecast(self):
         
@@ -262,9 +274,21 @@ class ForecastModuleLSTM(ForecastModule):
         preds = self.model.forecast(self.x_static, self.x_met, self.y_prog)
         self.y_prog_prediction[self.model.lookback:, ...] = preds.squeeze(0)
 
-        if self.skip_hindcast:
-            self.y_prog_prediction = self.y_prog_prediction[self.model.lookback:, ...]
-            self.y_prog = self.y_prog[self.model.lookback:, ...]
+    def backtransformation(self, y_prog_prediction, y_prog):
+        
+        print("Backtransforming")
+
+        y_prog_prediction = self.dataset.prog_inv_transform(y_prog_prediction, 
+                                                                means = self.dataset.y_prog_means, 
+                                                                stds = self.dataset.y_prog_stdevs, 
+                                                                maxs = self.dataset.y_prog_maxs)
+        y_prog = self.dataset.prog_inv_transform(y_prog, 
+                                                        means = self.dataset.y_prog_means, 
+                                                        stds = self.dataset.y_prog_stdevs, 
+                                                        maxs = self.dataset.y_prog_maxs)
+
+        return y_prog, y_prog_prediction
+
 
 class ForecastModuleXGB(ForecastModule):
 
@@ -304,10 +328,17 @@ class ForecastModuleXGB(ForecastModule):
     def _create_prediction_container(self):
         return np.full_like(self.y_prog, np.nan, dtype=float)
     
-    def perturb_prediction(self, original_vector):
+    def _perturb_initial_conditions(self):
 
-        if self.perturbation is not None:
-            return np.random.normal(loc=original_vector, scale=self.perturbation)
+        if self.initial_conditions_perturbation is not None:
+            return np.random.normal(loc=self.initial_conditions, scale=self.initial_conditions_perturbation)
+        else:
+            return self.initial_conditions
+    
+    def _perturb_prediction(self, original_vector):
+
+        if self.predictions_perturbation is not None:
+            return np.random.normal(loc=original_vector, scale=self.predictions_perturbation)
         else:
             return original_vector
     
@@ -324,5 +355,5 @@ class ForecastModuleXGB(ForecastModule):
             logits = self.model.predict(step_predictors)
             prediction = self.y_prog_prediction[time_idx, ...] + logits.squeeze()
             # Perturn only on step after intitialisation
-            prediction = self.perturb_prediction(prediction) if time_idx == 1 else prediction
+            prediction = self._perturb_prediction(prediction) if time_idx == 1 else prediction
             self.y_prog_prediction[time_idx+1, ...] = prediction

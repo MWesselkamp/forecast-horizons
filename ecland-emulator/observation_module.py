@@ -1,6 +1,7 @@
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import os
 import sys 
 import torch
@@ -11,7 +12,11 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 class ObservationModule:
 
-    def __init__(self, network = 'soil_TERENO_ISMN_2022.nc', station = None, variable = 'st', depth = None):
+    def __init__(self, 
+                 network = 'soil_TERENO_ISMN_2022.nc', 
+                 station = None, 
+                 variable = 'st', 
+                 depth = None):
         
         self.network = network
         self.station = station
@@ -23,10 +28,32 @@ class ObservationModule:
         self._process_variable = self._process_temperature if variable == 'st' else self._process_soilmoisture
 
     def load_station(self, 
+                     years = None,
                      data_path = '/perm/dadf/HSAF_validation/in_situ_data/pre_processed_data/ismn_nc'):
+        self.years = years
+        self.data_path = data_path
+        if (years is None) | (len(years) == 1):
+            self._load_single_year()
+        else:
+            self._load_multiple_years()
 
-        # Load measurements from one soil data station
-        self.network_data = xr.open_dataset(os.path.join(data_path,self.network))
+    def _load_single_year(self):
+        
+        self.network_data = xr.open_dataset(os.path.join(self.data_path,self.network))
+        if self.station is not None:
+            print("Select station: ", self.station)
+            self.network_data = self.network_data.sel(station_id = [self.station])
+        if self.depth is not None:
+            print("Select depth: ", self.depth)
+            self.network_data = self.network_data.sel(depth = self.depth)
+
+    def _load_multiple_years(self):
+        
+        file_names = [re.sub(r'(\d{4})', str(year), self.network) for year in self.years]
+        file_paths = [os.path.join(self.data_path, file_name) for file_name in file_names]
+
+        self.network_data = xr.open_mfdataset(file_paths, combine='by_coords')
+
         if self.station is not None:
             print("Select station: ", self.station)
             self.network_data = self.network_data.sel(station_id = [self.station])
@@ -74,33 +101,44 @@ class ObservationModule:
     def _process_soilmoisture(self):
         return self.variable_data 
 
-    def process_station_data(self):
+    def process_station_data(self, path_to_plots):
 
         self.variable_data = self.network_data[self.variable] 
         self.variable_data = self._process_variable()
 
         print("Resampling to 6-hourly mean.")
-        self.station_data_6hr_mean = self.variable_data.resample(time='6h').mean()
+        self.variable_data = self.variable_data.resample(time='6h').mean()
+        self._plot_station_data(save_to=path_to_plots)
 
-        print("Length of data set:", len(self.station_data_6hr_mean['time']))
-        self.station_data_6hr_mean_tensor = torch.tensor(self.station_data_6hr_mean.values, dtype=torch.float32)
+        print("Length of data set:", len(self.variable_data['time']))
+        self.variable_data_tensor = torch.tensor(self.variable_data.values, dtype=torch.float32)
 
-        return self.station_data_6hr_mean_tensor
+    def slice_station_data(self, lookback = 0, t_0 = '2022-01-01T00:00:00'):
+
+        t_0_datetime = pd.to_datetime(t_0)
+
+        t_0_index = self.variable_data.time.get_index('time').get_loc(t_0_datetime)
+        print("Selecting from index:", t_0_index)
+
+        variable_data_slice = self.variable_data.isel(time=slice(t_0_index - lookback, None))
+        self.variable_data_tensor = torch.tensor(variable_data_slice.values, dtype=torch.float32)
+
+        return self.variable_data_tensor
     
-    def plot_station_data(self, save_to):
+    def _plot_station_data(self, save_to):
 
-        self.station_data_6hr_mean.plot()
+        self.variable_data.plot()
         plt.savefig(os.path.join(save_to, f'{self.network_name}_image_plot.pdf'))
         plt.show()
 
     def transform_station_data(self, dataset, target_variables):
 
         self.matching_indices = [i for i, val in enumerate(dataset.targ_lst) if val in target_variables]
-        station_data_transformed = dataset.prog_transform(self.station_data_6hr_mean_tensor, 
+        variable_data = dataset.prog_transform(self.variable_data_tensor, 
                                                           means=dataset.y_prog_means[self.matching_indices], 
                                                           stds=dataset.y_prog_stdevs[self.matching_indices])
         
-        return station_data_transformed
+        return variable_data
 
 
 
