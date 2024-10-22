@@ -336,26 +336,16 @@ class EcDataset(Dataset):
     
         ds_slice = self._slice_dataset()
 
-        # Extract dynamic features, convert to numpy array for transformations
-        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
-        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
-    
         # Static features are already precomputed and stored in x_static_scaled
         X_static = self.x_static_scaled
-    
-        # Extract prognostic targets, convert to numpy array for transformations
-        Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values)
+        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
+        Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values) 
+        Y_prog_initial_states = Y_prog[0]
+
+        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
         Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
     
-        # Check the model type and handle increment calculation or diagnostic target selection
-        if self.targ_diag_index is not None:
-            # Extract diagnostic targets, convert to numpy array for transformations
-            Y_diag = tensor(ds_slice['data'].isel(variable=self.targ_diag_index).values)
-            Y_diag = self.diag_transform(Y_diag, means=self.y_diag_means, stds=self.y_diag_stdevs, maxs=self.y_diag_maxs)
-            return X_static, X, Y_prog, Y_diag
-    
-        else:
-            return X_static, X, Y_prog
+        return X_static, X, Y_prog, Y_prog_initial_states
             
     def _calculate_effective_length(self):
         return self.len_dataset - 1 - self.rollout
@@ -507,19 +497,15 @@ class EcDatasetXGB(EcDataset):
         """
     
         ds_slice = self._slice_dataset()
-
-        # Extract dynamic features, convert to numpy array for transformations
-        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
-        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
-    
+        
         # Static features are already precomputed and stored in x_static_scaled
         X_static = self.x_static_scaled
-    
-        # Extract prognostic targets, convert to numpy array for transformations
+        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
         Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values)
-        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
-    
-        Y_inc = Y_prog[1:, :, :] - Y_prog[:-1, :, :]
+        Y_prog_initial_states = Y_prog[0]
 
-        return X_static, X[:-1], Y_prog[:-1], Y_inc
+        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
+        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
+
+        return X_static, X[:-1], Y_prog[:-1], Y_prog_initial_states
     

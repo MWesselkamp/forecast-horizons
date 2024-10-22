@@ -51,22 +51,26 @@ class ForecastModule(ABC):
     def load_test_data(self, dataset):
         
         self.dataset = dataset
-        self.x_static, self.x_met, self.y_prog = self.dataset.load_data() 
-        self._set_forcing()
+        self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state = self.dataset.load_data() 
+        self._set_forcing_device()
 
-        return self.x_static, self.x_met, self.y_prog 
+        return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state
         
     def _set_initial_conditions(self):
 
         if self.initial_conditions is None:
-            return self.y_prog[0,...]
+            # this initial state vector will be untransformed for a shared perturbation.
+            self.initial_conditions = self.y_prog_initial_state
+            return self.initial_conditions
         else:
             return self.initial_conditions
         
     def _perturb_initial_conditions(self):
-
+        
+        # we take self.initial_conditions_perturbation now as the perturbation factor, proportional to the size of the variable
         if self.initial_conditions_perturbation is not None:
-            return torch.normal(mean=self.initial_conditions, std=self.initial_conditions_perturbation)
+            perturbation = torch.rand(self.initial_conditions.shape) * 2 - 1 # uniform distribution between -1 and 1.
+            return self.initial_conditions * (1 + self.initial_conditions_perturbation * perturbation)
         else:
             return self.initial_conditions
         
@@ -78,7 +82,7 @@ class ForecastModule(ABC):
             return original_vector
 
 
-    def _set_forcing(self):
+    def _set_forcing_device(self):
 
         print(f"Model to device: {self.my_device}")
         self.x_static, self.x_met, self.y_prog = self.x_static.to(self.my_device), self.x_met.to(self.my_device), self.y_prog.to(self.my_device)
@@ -220,13 +224,13 @@ class ForecastModuleLSTM(ForecastModule):
         return dataset
     
     def _process_data(self):
-        return self.x_static, self.x_met[self.config["lookback"]:], self.y_prog[self.config["lookback"]:]
+        return self.x_static, self.x_met[self.config["lookback"]:], self.y_prog[self.config["lookback"]:], self.y_prog_initial_state 
     
     def load_test_data(self, dataset):
         
         self.dataset = dataset
-        self.x_static, self.x_met, self.y_prog = self.dataset.load_data() 
-        self._set_forcing()
+        self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state = self.dataset.load_data() 
+        self._set_forcing_device()
 
         return self._process_data()
     
@@ -319,12 +323,12 @@ class ForecastModuleXGB(ForecastModule):
     def load_test_data(self, dataset):
         
         self.dataset = dataset
-        self.x_static, self.x_met, self.y_prog , _ = dataset.load_data() 
-        self._set_forcing()
+        self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state = dataset.load_data() 
+        self._set_forcing_device()
 
-        return self.x_static, self.x_met, self.y_prog 
+        return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state
     
-    def _set_forcing(self):
+    def _set_forcing_device(self):
         self.x_static, self.x_met, self.y_prog = self.x_static.to(self.my_device), self.x_met.to(self.my_device), self.y_prog.to(self.my_device)
 
     def _create_prediction_container(self):
@@ -333,7 +337,8 @@ class ForecastModuleXGB(ForecastModule):
     def _perturb_initial_conditions(self):
 
         if self.initial_conditions_perturbation is not None:
-            return np.random.normal(loc=self.initial_conditions, scale=self.initial_conditions_perturbation)
+            perturbation = np.random.uniform(-1, 1, size=self.initial_conditions.shape)
+            return self.initial_conditions * (1 + self.initial_conditions_perturbation * perturbation)
         else:
             return self.initial_conditions
     

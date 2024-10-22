@@ -131,12 +131,16 @@ class ObservationModule:
         plt.savefig(os.path.join(save_to, f'{self.network_name}_image_plot.pdf'))
         plt.show()
 
-    def transform_station_data(self, dataset, target_variables):
+    def match_indices(self, dataset, target_variables):
+        self.dataset = dataset
+        self.matching_indices = [i for i, val in enumerate(self.dataset.targ_lst) if val in target_variables]
+        return self.matching_indices
+    
+    def transform_station_data(self, station_data):
 
-        self.matching_indices = [i for i, val in enumerate(dataset.targ_lst) if val in target_variables]
-        variable_data = dataset.prog_transform(self.variable_data_tensor, 
-                                                          means=dataset.y_prog_means[self.matching_indices], 
-                                                          stds=dataset.y_prog_stdevs[self.matching_indices])
+        variable_data = self.dataset.prog_transform(station_data, 
+                                                means=self.dataset.y_prog_means[self.matching_indices], 
+                                                stds=self.dataset.y_prog_stdevs[self.matching_indices])
         
         return variable_data
 
