@@ -1,0 +1,35 @@
+targets_eval:
+  - stl1
+  - stl2
+  - stl3
+  #  - swvl1
+  # - swvl2
+  # - swvl3
+
+targets_prog:
+  - swvl1
+  - swvl2
+  - swvl3
+  - stl1
+  - stl2
+  - stl3
+  - snowc
+
+
+path_to_plots:  '../plots/'
+path_to_results: '../results/'
+
+network:  'soil_TERENO_ISMN_2022.nc' #'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
+station: 'Gevenich' # 'Lahas'
+variable: 'st'
+depth: [0.05, 0.2, 0.5]
+
+years: [2021, 2022]
+models: ['mlp', 'lstm', "xgb"] # , 'xgb'
+
+initial_time: '2022-01-01T00:00:00'
+
+threshold: 2 # Kelvin, for soil temperature.
+maximum_leadtime: 150 
+
+ensemble_size: 50
