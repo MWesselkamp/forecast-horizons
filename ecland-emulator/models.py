@@ -545,7 +545,7 @@ class LSTMregressor(L.LightningModule):
         
     def forecast(self, clim_feats, met_feats, states):
         
-        lead_time = states.shape[0] - self.lookback
+        lead_time = met_feats.shape[0] - self.lookback
         
         self.eval()
         

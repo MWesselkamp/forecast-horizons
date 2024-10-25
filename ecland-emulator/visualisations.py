@@ -18,25 +18,25 @@ class VisualisationModule:
         self.label_properties = {'weight':'bold', 'size':16}
         self.legend_properties = {'weight':'bold', 'size':14}
 
-    def plot_station_data(self, y_prog, station_data_transformed, matching_indices):
+    def plot_station_data(self, y_prog, station_data, matching_indices):
 
         fig, ax = plt.subplots(1, 3, figsize=(15, 5), sharex=True, sharey=True) 
 
         ax[0].plot(y_prog[:self.maximum_leadtime,:,matching_indices[0]], color="cyan", label="ECland")
-        ax[0].plot(station_data_transformed[:self.maximum_leadtime,:,0], color="green", label=f"{self.station}")
+        ax[0].plot(station_data[:self.maximum_leadtime,:,0], color="green", label=f"{self.station}")
         ax[0].set_title("Surface Layer", **self.label_properties)
         ax[0].set_xlabel('Lead time', **self.label_properties)
         ax[0].set_ylabel(self.ylabel, **self.label_properties)
         ax[0].legend(prop=self.legend_properties, loc = "upper right")
 
         ax[1].plot(y_prog[:self.maximum_leadtime,:,matching_indices[1]], color="cyan", label="ECland")
-        ax[1].plot(station_data_transformed[:self.maximum_leadtime,:,1], color="green", label=f"{self.station}")
+        ax[1].plot(station_data[:self.maximum_leadtime,:,1], color="green", label=f"{self.station}")
         ax[1].set_xlabel('Lead time', **self.label_properties)
         ax[1].set_title("Subsurface Layer 1", **self.label_properties)
         ax[1].legend(prop=self.legend_properties, loc = "upper right")
 
         ax[2].plot(y_prog[:self.maximum_leadtime,:,matching_indices[2]], color="cyan", label="ECland")
-        ax[2].plot(station_data_transformed[:self.maximum_leadtime,:,2], color="green", label=f"{self.station}")  
+        ax[2].plot(station_data[:self.maximum_leadtime,:,2], color="green", label=f"{self.station}")  
         ax[2].set_xlabel('Lead time', **self.label_properties)
         ax[2].set_title("Subsurface Layer 2", **self.label_properties)
         ax[2].legend(prop=self.legend_properties, loc = "upper right")

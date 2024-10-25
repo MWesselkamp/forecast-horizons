@@ -52,12 +52,12 @@ targets_diag:
   #- skt
 
 targets_eval:
-  #- stl1
-  #- stl2
-  #- stl3
-  - swvl1
-  - swvl2
-  - swvl3
+  - stl1
+  - stl2
+  - stl3
+  #- swvl1
+  #- swvl2
+  #- swvl3
 
 file_path: "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i6aj_o400_2010_2022_6h_euro.zarr"
 

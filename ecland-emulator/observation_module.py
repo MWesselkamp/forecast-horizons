@@ -110,20 +110,27 @@ class ObservationModule:
         self.variable_data = self.variable_data.resample(time='6h').mean()
         self._plot_station_data(save_to=path_to_plots)
 
-        print("Length of data set:", len(self.variable_data['time']))
-        self.variable_data_tensor = torch.tensor(self.variable_data.values, dtype=torch.float32)
+        #self.variable_data = self.variable_data.interpolate_na(dims = "depth", 
+        #                                                       method="nearest")
 
+        print("Length of data set:", len(self.variable_data['time']))
+        variable_data_tensor = torch.tensor(self.variable_data.values, dtype=torch.float32)
+
+        return variable_data_tensor
+    
     def slice_station_data(self, lookback = 0, t_0 = '2022-01-01T00:00:00'):
 
         t_0_datetime = pd.to_datetime(t_0)
 
         t_0_index = self.variable_data.time.get_index('time').get_loc(t_0_datetime)
         print("Selecting from index:", t_0_index)
+        t_lookback_index = t_0_index - lookback
+        print("Subtract lookback for new index:", t_lookback_index)
 
-        variable_data_slice = self.variable_data.isel(time=slice(t_0_index - lookback, None))
-        self.variable_data_tensor = torch.tensor(variable_data_slice.values, dtype=torch.float32)
+        variable_data_slice = self.variable_data.isel(time=slice(t_lookback_index, None))
+        variable_data_tensor = torch.tensor(variable_data_slice.values, dtype=torch.float32)
 
-        return self.variable_data_tensor
+        return variable_data_tensor
     
     def _plot_station_data(self, save_to):
 
@@ -133,14 +140,27 @@ class ObservationModule:
 
     def match_indices(self, dataset, target_variables):
         self.dataset = dataset
-        self.matching_indices = [i for i, val in enumerate(self.dataset.targ_lst) if val in target_variables]
-        return self.matching_indices
+        matching_indices = [i for i, val in enumerate(self.dataset.targ_lst) if val in target_variables]
+        return matching_indices
     
-    def transform_station_data(self, station_data):
+    def transform_initial_vector(self, station_data, matching_indices):
+
+        y_prog_means = self.dataset.y_prog_means[matching_indices]
+        y_prog_stds = self.dataset.y_prog_stdevs[matching_indices]
 
         variable_data = self.dataset.prog_transform(station_data, 
-                                                means=self.dataset.y_prog_means[self.matching_indices], 
-                                                stds=self.dataset.y_prog_stdevs[self.matching_indices])
+                                                means=y_prog_means, 
+                                                stds=y_prog_stds)
+        
+        return variable_data
+    
+    def transform_station_data(self, station_data, target_variable_list):
+
+        y_prog_means, y_prog_stds, _ = self.dataset.get_prognostic_standardiser(target_variable_list)
+
+        variable_data = self.dataset.prog_transform(station_data, 
+                                                means=y_prog_means, 
+                                                stds=y_prog_stds)
         
         return variable_data
 

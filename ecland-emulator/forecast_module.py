@@ -56,14 +56,9 @@ class ForecastModule(ABC):
 
         return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state
         
-    def _set_initial_conditions(self):
+    def _set_initial_conditions(self, initial_conditions):
 
-        if self.initial_conditions is None:
-            # this initial state vector will be untransformed for a shared perturbation.
-            self.initial_conditions = self.y_prog_initial_state
-            return self.initial_conditions
-        else:
-            return self.initial_conditions
+        return initial_conditions
         
     def _perturb_initial_conditions(self):
         
@@ -97,7 +92,7 @@ class ForecastModule(ABC):
         return torch.full_like(self.y_prog, float('nan'))
 
     def run_forecast(self, 
-                     initial_conditions = None,
+                     initial_conditions,
                      initial_conditions_perturbation = None,
                      predictions_perturbation = None):
 
@@ -107,11 +102,10 @@ class ForecastModule(ABC):
         """
         self.predictions_perturbation = predictions_perturbation
         self.initial_conditions_perturbation = initial_conditions_perturbation
-        self.initial_conditions = initial_conditions
 
         self.y_prog_prediction = self._create_prediction_container()
-        self.y_prog_prediction[0,...] = self._set_initial_conditions()
-        self.y_prog_prediction[0,...] = self._perturb_initial_conditions()
+        self.y_prog_prediction[:initial_conditions.shape[0]] = initial_conditions
+        #self.y_prog_prediction[0,...] = self._perturb_initial_conditions()
         print("Initialised prediction.")
     
         start_time = time.time()
@@ -224,7 +218,7 @@ class ForecastModuleLSTM(ForecastModule):
         return dataset
     
     def _process_data(self):
-        return self.x_static, self.x_met[self.config["lookback"]:], self.y_prog[self.config["lookback"]:], self.y_prog_initial_state 
+        return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state 
     
     def load_test_data(self, dataset):
         
@@ -267,31 +261,34 @@ class ForecastModuleLSTM(ForecastModule):
 
         return self.model
     
-    def handle_hindcast(self, skip = True):
-        if skip:
-            return self.y_prog[self.model.lookback:, ...], self.y_prog_prediction[self.model.lookback:, ...]
-        else:
-            return self.y_prog, self.y_prog_prediction
+    def _handle_hindcast(self, y_prog, y_prog_prediction):
+        y_prog = y_prog[self.config["lookback"]:, ...],
+        y_prog_prediction = y_prog_prediction[self.config["lookback"]:, ...]
+        return y_prog, y_prog_prediction
 
     def step_forecast(self):
         
-        test_forecast_shapes(self.model, self.x_static, self.x_met, self.y_prog) # Test data structures before forecasting
+        test_forecast_shapes(self.model, self.x_static, self.x_met, self.y_prog_prediction) # Test data structures before forecasting
 
-        preds = self.model.forecast(self.x_static, self.x_met, self.y_prog)
-        self.y_prog_prediction[self.model.lookback:, ...] = preds.squeeze(0)
+        self.preds = self.model.forecast(self.x_static, self.x_met, self.y_prog_prediction)
+        self.y_prog_prediction[self.model.lookback:, ...] = self.preds.squeeze(0)
 
-    def backtransformation(self, y_prog_prediction, y_prog):
-        
-        print("Backtransforming")
+    def backtransformation(self, skip_hindcast = True):
 
-        y_prog_prediction = self.dataset.prog_inv_transform(y_prog_prediction, 
+        y_prog_prediction = self.dataset.prog_inv_transform(self.y_prog_prediction, 
                                                                 means = self.dataset.y_prog_means, 
                                                                 stds = self.dataset.y_prog_stdevs, 
                                                                 maxs = self.dataset.y_prog_maxs)
-        y_prog = self.dataset.prog_inv_transform(y_prog, 
+        y_prog = self.dataset.prog_inv_transform(self.y_prog, 
                                                         means = self.dataset.y_prog_means, 
                                                         stds = self.dataset.y_prog_stdevs, 
                                                         maxs = self.dataset.y_prog_maxs)
+        
+        if skip_hindcast:
+            print("Skipping LSTM hindcast.")
+            y_prog, y_prog_prediction = self._handle_hindcast(y_prog, y_prog_prediction)
+
+        print("Backtransforming")
 
         return y_prog, y_prog_prediction
 

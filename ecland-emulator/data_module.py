@@ -158,6 +158,21 @@ class EcDataset(Dataset):
         ).reshape(1, self.x_size, -1)
 
         print(self.x_static_scaled.shape)
+
+    def get_prognostic_standardiser(self, target_list):
+
+        # Prognostic target list
+        self.targ_lst = target_list
+        self.targ_index = [
+            list(self.ds_ecland["variable"]).index(x) for x in target_list
+        ]
+
+        # Define statistics for normalising the targets
+        y_prog_means = tensor(self.ds_ecland.data_means.values[self.targ_index])
+        y_prog_stdevs = tensor(self.ds_ecland.data_stdevs.values[self.targ_index])
+        y_prog_maxs = tensor(self.ds_ecland.data_maxs.values[self.targ_index])
+
+        return y_prog_means, y_prog_stdevs, y_prog_maxs
     
     def _initialize_spatial_indices(self):
         
@@ -427,66 +442,26 @@ class EcDatasetLSTM(EcDataset):
                 x=slice(*self.x_idxs)
             )
         
-    def __getitem__(self, idx):
+    def load_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        
+        """Load data into memory. **CAUTION ONLY USE WHEN WORKING WITH DATASET THAT FITS IN MEM**
+    
+        :return: static_features, dynamic_features, prognostic_targets, diagnostic_targets
+        """
+    
+        ds_slice = self._slice_dataset()
 
-        # print(f"roll: {self.rollout}, lends: {self.len_dataset}, x_size: {self.x_size}")
-        effective_length = self._calculate_effective_length()
+        # Static features are already precomputed and stored in x_static_scaled
+        X_static = self.x_static_scaled
+        X = tensor(ds_slice['data'].isel(variable=self.dynamic_index).values)
+        Y_prog = tensor(ds_slice['data'].isel(variable=self.targ_index).values) 
+        Y_prog_initial_states = Y_prog[:self.lookback]
 
-        t_start_idx = (idx % effective_length) + self.start_index
-        t_end_idx = (idx % effective_length) + self.start_index + self.lookback + self.rollout + 1
-        
-        if self.spatial_sample_size is not None:
-            x_idx = [x + self.x_idxs[0] for x in self.chunked_x_idxs[(idx % self.chunk_size)]]
-        else:
-            x_idx = (idx % self.x_size) + self.x_idxs[0]
-        
-        ds_slice = tensor(
-            self.ds_ecland.data[
-                slice(t_start_idx, t_end_idx), :, :
-            ]
-        )
-        print("x_idx:", x_idx)
-        print("ds_slice shape:", ds_slice.shape)
-        ds_slice = ds_slice[:, x_idx, :]
-        print("ds_slice shape:", ds_slice.shape)
-
-        X = ds_slice[:, :, self.dynamic_index]
-        X = self.dyn_transform(X, means = self.x_dynamic_means, stds = self.x_dynamic_stdevs, maxs = self.x_dynamic_maxs)
-        
-        X_static = self.x_static_scaled.expand(self.rollout+self.lookback, -1, -1)
-        X_static = X_static[:, x_idx, :]
-        
-        Y_prog = ds_slice[:, :, self.targ_index]
-        Y_prog = self.prog_transform(Y_prog, means = self.y_prog_means, stds = self.y_prog_stdevs, maxs = self.y_prog_maxs)
-        
-        Y_inc = Y_prog[1:,:, :] - Y_prog[:-1, :, :] # Calculate delta_x update for corresponding x state
-        
-        X_static_h = X_static[:self.lookback] 
-        X_static_f = X_static[self.lookback:(self.lookback + self.rollout)]
-            
-        X_h = X[:self.lookback]
-        X_f = X[self.lookback:(self.lookback + self.rollout)]
-        
-        Y_prog_h = Y_prog[:self.lookback]
-        Y_prog_f = Y_prog[self.lookback:(self.lookback + self.rollout)]
-
-        Y_inc_h = Y_inc[:self.lookback]
-        Y_inc_f = Y_inc[self.lookback:(self.lookback + self.rollout)]
-            
-        if self.targ_diag_index is not None:
-                
-            Y_diag = ds_slice[:, :, self.targ_diag_index]
-            Y_diag = self.transform(Y_diag, self.y_diag_means, self.y_diag_stdevs)
-            
-            Y_diag_h = Y_diag[:self.lookback]
-            Y_diag_f = Y_diag[self.lookback:self.lookback + self.rollout]
-                
-            return X_static_h, X_static_f, X_h, X_f, Y_prog_h, Y_prog_f, Y_diag_h, Y_diag_f
-            
-        else:
-                
-            return X_static_h, X_static_f, X_h, X_f, Y_prog_h, Y_prog_f, Y_inc_h, Y_inc_f
-
+        X = self.dyn_transform(X, means=self.x_dynamic_means, stds=self.x_dynamic_stdevs, maxs=self.x_dynamic_maxs)
+        Y_prog = self.prog_transform(Y_prog, means=self.y_prog_means, stds=self.y_prog_stdevs,)
+    
+        return X_static, X, Y_prog, Y_prog_initial_states
+    
 class EcDatasetXGB(EcDataset):
 
     def load_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
