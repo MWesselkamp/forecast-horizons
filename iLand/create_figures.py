@@ -9,11 +9,32 @@ from iLand.helpers import *
 dm = DataSets()
 measurements, predictions_h100, predictions, measurements_subset = dm.get_data(baumarten_num = [1, 2, 3, 4, 5, 7])
 
+species = 'piab'
+visualisation_subset = predictions.query("species == 'piab' & site_index == 10")
+visualisation_subset_m = measurements.query("species == 'piab' & dGz100 == 10")
+ae_rhos= []
+for ridx in visualisation_subset.rid.unique():
+    piab_DM = DataModule(species=species,
+                        stand_idx=ridx,
+                        standard=1)
+
+    piab_DM.process_data_subsets(measurements, predictions)
+    piab_DM.create_reference()
+    piab_DM.create_reference_standards()
+    piab_data = piab_DM.get_results_dataframe()
+    EM = EvaluationModule(piab_data)
+    species_data = EM.get_extended_results()
+    select_columns = ['ae_lower', 'ae_upper']
+    ae_rhos.append(species_data[select_columns].mean(axis = 1, skipna=True ))
+
 # Create some plots of the idealized measurements, the predictions at age 100 and predicted timeseries.
 create_dominant_heights_correlation_plot(measurements_subset, predictions_h100,
                                          "iLand/plots/dominant_heights_correlation_h100.pdf")
 
-create_site_index_boundaries_plot(measurements, predictions, site_index = 10, species='piab',
+create_site_index_boundaries_plot(measurements, predictions,
+                                  rho_g= np.array(ae_rhos),
+                                  site_index = 10,
+                                  species='piab',
                                   save_to="iLand/plots/site_index_forecast.pdf")
 
 create_boundaries_scheme_plot(measurements_subset,
