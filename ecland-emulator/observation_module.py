@@ -101,22 +101,24 @@ class ObservationModule:
     def _process_soilmoisture(self):
         return self.variable_data 
 
-    def process_station_data(self, path_to_plots):
+    def process_station_data(self, path_to_plots = None):
 
         self.variable_data = self.network_data[self.variable] 
         self.variable_data = self._process_variable()
 
         print("Resampling to 6-hourly mean.")
         self.variable_data = self.variable_data.resample(time='6h').mean()
-        self._plot_station_data(save_to=path_to_plots)
+        
+        if path_to_plots is not None:
+            self._plot_station_data(save_to=path_to_plots)
 
         #self.variable_data = self.variable_data.interpolate_na(dims = "depth", 
         #                                                       method="nearest")
 
-        print("Length of data set:", len(self.variable_data['time']))
-        variable_data_tensor = torch.tensor(self.variable_data.values, dtype=torch.float32)
+        #print("Length of data set:", len(self.variable_data['time']))
+        #variable_data_tensor = torch.tensor(self.variable_data.values, dtype=torch.float32)
 
-        return variable_data_tensor
+        #return variable_data_tensor
     
     def slice_station_data(self, lookback = 0, t_0 = '2022-01-01T00:00:00'):
 
