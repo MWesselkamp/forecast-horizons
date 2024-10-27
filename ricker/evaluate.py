@@ -2,15 +2,17 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 
-from ricker.visualisations import *
+from ricker.visualisation_module import *
 from ricker.settings import *
 from ricker.models import *
-from ricker.evaluation_module import EvaluationModule
+from ricker.evaluation_module import *
 
 config = load_config("configs/ricker.yaml")
 observation_params = config['chaotic']['observation_params']
 observation_noise = config['chaotic']['observation_noise']['stochastic']
 initial_conditions = config['chaotic']['initial_conditions']
+
+RickerPlots = VisualisationModule(config)
 
 initial_conditions_distribution = {
     'species1': lambda: np.random.normal(initial_conditions['species1_mean'],
@@ -27,28 +29,25 @@ climatological_data = observation_model.create_observations(years=config['simula
 climatology = climatological_data.get('climatology').view((2, config['simulation']['climatology'] - 1 , config['forcing']['resolution']))
 climatological_variability_species1 = torch.std(climatology[0, :, :])
 climatological_variability_species2 = torch.std(climatology[1, :, :])
-#climatological_variability_seasonal_species1 = torch.tensor([torch.std(climatology[0, :, t]) for t in range(climatology.shape[2])])
-#climatological_variability_seasonal_species2 = torch.tensor([torch.std(climatology[1, :, t]) for t in range(climatology.shape[2])])
-#plt.plot(climatological_variability_seasonal_species1, color = "blue")
-#plt.plot(climatological_variability_seasonal_species2, color = "green")
-#plt.show()
 
-plt.plot(climatology[0,:,:].detach().numpy().transpose(), color = "blue")
-plt.plot(climatology[1,:,:].detach().numpy().transpose(), color = "green")
-plt.show()
 
 lyapunovs = [observation_model.compute_lyapunov_exponent(t) for t in range(1, climatological_data['y_train'].shape[1])]
 plt.plot(lyapunovs)
 plt.show()
 
 observed_data = observation_model.create_observations(years=1)
-observation_model.plot_time_series(observed_data, 'y_test', climatology  = climatology.detach().numpy().reshape(-1, 200).transpose())
+
+series_data = observed_data['y_test']
+series_data = series_data.detach().numpy()
+series_data = series_data.transpose()
+
+RickerPlots.plot_simulations(observed_data, 'y_test', climatology  = climatology.detach().numpy().reshape(-1, 200).transpose())
 
 ensemble_size = config['simulation']['ensemble_size']
 ensemble = observation_model.create_ensemble(ensemble_size,
                                              forcing=observed_data.get('x_test'),
                                              years=1)
-plot_ensemble(ensemble)
+RickerPlots.plot_ensemble(ensemble)
 
 Evaluation = EvaluationModule(ensemble, climatology, config)
 species1_PPP = [
@@ -80,9 +79,9 @@ PPP_threshold_species1 = Evaluation.PPP_threshold(df1=dof_withingroups,
 PPP_threshold_species2 = Evaluation.PPP_threshold(df1=dof_withingroups,
                                          df2=dofs_climatology[1])
 
-plot_ppp(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2)
+RickerPlots.plot_ppp(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2)
 
-plot_combined(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2, ensemble)
+RickerPlots.plot_combined(species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2, ensemble)
 
 species1_normalised_variances = np.array([
     Evaluation.bootstrap_normalised_variances(species1_X, t, climatological_variability_species1).detach().numpy() for t in range(species1_X.shape[2])])
@@ -91,14 +90,20 @@ species2_normalised_variances = np.array([
     Evaluation.bootstrap_normalised_variances(species2_X, t, climatological_variability_species2).detach().numpy() for t in range(species2_X.shape[2])])
 
 
-plot_combined_2(species1_normalised_variances, species2_normalised_variances,
+RickerPlots.plot_combined_2(species1_normalised_variances, species2_normalised_variances,
               species1_PPP, species2_PPP, PPP_threshold_species1, PPP_threshold_species2,
                 time_horizon = 28)
 
-plot_combined_3(species1_normalised_variances, species2_normalised_variances,
+RickerPlots.plot_combined_3(species1_normalised_variances, species2_normalised_variances,
                 species1_X[0,...].detach().numpy().transpose(), species2_X[0,...].detach().numpy().transpose(),
               PPP_threshold_species1, PPP_threshold_species2,
-                time_horizon = 28)
+                            time_horizon = 28)
+
+RickerPlots.plot_combined_4(
+    observed_data, 'y_test', climatology.detach().numpy().reshape(-1, 200).transpose(),
+    species1_normalised_variances, species2_normalised_variances,
+    PPP_threshold_species1, PPP_threshold_species2,
+    time_horizon = 200)
 
 # =========================================== #
 # horizons from different initial conditions  #
@@ -118,9 +123,8 @@ for i in range(0,80):
 
     lyapunovs.append(observation_model.compute_lyapunov_exponent())
 
-    Evaluation = EvaluationModule(ensemble)
-    bootrap_container = Evaluation.bootstrap_ensemble(bootstrap_samples=50,
-                                                      ensemble_samples=40)
+    Evaluation = EvaluationModule(ensemble, climatology, config)
+    bootrap_container = Evaluation.bootstrap_ensemble()
 
     species1_X = bootrap_container[..., 0, :]
     species2_X = bootrap_container[..., 1, :]
@@ -147,8 +151,8 @@ print(np.array(lyapunovs).max())
 horizons_species1 = (iterated_dynamics_species1 < PPP_threshold_species1).astype(int)
 horizons_species2 = (iterated_dynamics_species2 < PPP_threshold_species2).astype(int)
 
-plot_horizon_maps(iterated_dynamics_species1[:60,:60],
+RickerPlots.plot_horizon_maps(iterated_dynamics_species1[:60,:60],
                   iterated_dynamics_species2[:60,:60])
 
-plot_binary_horizon_maps(horizons_species1[:80,:80],
+RickerPlots.plot_binary_horizon_maps(horizons_species1[:80,:80],
                   horizons_species2[:80,:80])

@@ -212,34 +212,6 @@ class RickerPredation(nn.Module):
 
         return lyapunov_exponent.item()  # Convert to Python float
 
-    def plot_time_series(self, observations_dict, series_name, climatology = None):
-        """
-        Plot the specified time series from the observations dictionary.
-
-        Parameters:
-        - observations_dict: Dictionary containing time series data.
-        - series_name: The key of the time series to plot (e.g., 'y_train', 'y_test', etc.).
-        """
-        if series_name not in observations_dict:
-            raise ValueError(f"Series name '{series_name}' not found in observations.")
-
-        series_data = observations_dict[series_name]
-
-        if not isinstance(series_data, np.ndarray):
-            series_data = series_data.detach().numpy()
-
-        if series_data.shape[0] > 1:
-            series_data = series_data.transpose()
-
-        plt.figure(figsize=(10, 5))
-        if not climatology is None:
-            plt.plot(climatology, color = "lightgray", alpha = 0.8)
-        plt.plot(series_data, label=series_name)
-        plt.title(f"Time Series: {series_name}")
-        plt.xlabel("Time")
-        plt.ylabel("Value")
-        plt.legend()
-        plt.show()
     def __repr__(self):
         param_values = [f"{name}: {value.item()}" for name, value in zip(
             ["alpha1", "beta1", "gamma1", "bx1", "cx1", "alpha2", "beta2", "gamma2", "bx2", "cx2"],

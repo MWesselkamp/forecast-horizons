@@ -67,7 +67,7 @@ class EvaluationModule:
         # Step 4: Sum the normalized squared differences across all samples
         sum_terms = normalized_diff_squared.sum()  # Scalar
 
-        # Step 5: Compute PPP(t) using the formula with division by (N - 1)
+        # Step 5: Compute PPP(t)
         PPP_t = 1 - (1 / (N - 1)) * sum_terms
 
         return PPP_t
