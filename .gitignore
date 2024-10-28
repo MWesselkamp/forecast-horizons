@@ -2,6 +2,7 @@
 analyses/
 plots/
 results/
+shell_scripts/
 
 ecland-emulator/lstm
 ecland-emulator/mlp

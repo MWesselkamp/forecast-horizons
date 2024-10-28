@@ -18,7 +18,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, r
 from helpers import r2_score_multi, anomaly_correlation, standardized_anomaly
 
 
-class EvaluationModule:
+class EvaluationBasic:
     
     def __init__(self, 
                 score, 
@@ -89,7 +89,7 @@ class EvaluationModule:
         return model_score/reference_score
     
 
-class PointEvaluation(EvaluationModule):
+class PointEvaluation(EvaluationBasic):
 
     def subset_samples(self):
         
@@ -130,7 +130,7 @@ class PointEvaluation(EvaluationModule):
         return eval_array
 
 
-class EnsembleEvaluation(EvaluationModule):
+class EnsembleEvaluation(EvaluationBasic):
 
     def subset_samples(self):
         
@@ -179,3 +179,84 @@ class EnsembleEvaluation(EvaluationModule):
                                           self.fc_emulator[:, t]) for t in range(self.maximum_evaluation_time)])
         
         return eval_array
+    
+
+class EvaluationModule:
+
+    def __init__(self,
+                 observations, 
+                 fc_numerical, 
+                 fc_emulators,
+                 evaluator):
+
+        self.observations = observations
+        self.fc_numerical = fc_numerical
+        self.fc_emulators = fc_emulators
+        self.evaluator = evaluator
+
+    def initialise_evaluator(self,
+                             score,
+                             layer_index,
+                             variable_indices,
+                             maximum_evaluation_time):
+        
+        self.score = score
+        self.variable_indices = variable_indices
+        self.maximum_evaluation_time = maximum_evaluation_time
+        
+        if self.evaluator == "ensemble":
+            self.EvaluateModel = EnsembleEvaluation(score =  score,
+                                        layer_index = layer_index,
+                                        variable_indices = variable_indices,
+                                        maximum_evaluation_time = maximum_evaluation_time)
+        elif self.evaluator == "point":
+            self.EvaluateModel = PointEvaluation(score =  score,
+                                    layer_index = layer_index,
+                                    variable_indices = variable_indices,
+                                    maximum_evaluation_time = maximum_evaluation_time)
+        else:
+            print("Don't know evaluator")
+
+    def evaluate(self):
+
+        self.EvaluateModel.set_samples(observations=self.observations ,
+                                fc_numerical=self.fc_numerical,
+                                fc_emulator=self.fc_emulators)
+        self.EvaluateModel.subset_samples()
+        
+        numerical_score = self.EvaluateModel.evaluate_stepwise(model = "numerical")
+        emulator_score = self.EvaluateModel.evaluate_stepwise(model = "emulator")
+        skill = self.EvaluateModel.get_skill_score()
+
+        return numerical_score, emulator_score, skill
+
+    def _scores_container(self):
+        scores = {}
+        skill_scores = {}
+        return scores, skill_scores
+
+    def _layers_container(self):
+        self.layers = {}
+
+    def run_ensemble_evaluation(self):
+
+        self._layers_container()
+        for layer in [0,1,2]:
+            scores, skill_scores = self._scores_container()
+            self.EvaluateModel = EnsembleEvaluation(score = self.score,
+                                        layer_index = layer,
+                                        variable_indices = self.variable_indices,
+                                        maximum_evaluation_time = self.maximum_evaluation_time)
+            numerical_score, emulator_score, skill = self.evaluate()
+            
+    def run_point_evaluation(self):
+
+        self._layers_container()
+        for layer in [0,1,2]:
+            scores, skill_scores = self._scores_container()
+            self.EvaluateModel = PointEvaluation(score = self.score,
+                                        layer_index = layer,
+                                        variable_indices = self.variable_indices,
+                                        maximum_evaluation_time = self.maximum_evaluation_time)
+            for mod, fc_emulator in self.fc_emulators.items():
+                numerical_score, emulator_score, skill = self.evaluate()

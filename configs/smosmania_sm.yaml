@@ -19,8 +19,8 @@ targets_prog:
 path_to_plots:  '../plots/'
 path_to_results: '../results/'
 
-network:  'soil_SMOSMANIA_ISMN_2022.nc' #'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
-station: 'Condom' #'Gevenich' # 'Lahas' # CabrieresdAvignon, 'Narbonne' 'CreondArmagnac', 'LaGrandCombe', 'LezignanCorbieres', 'Mazan-Abbaye', 'Mejannes-le-Clap'...
+network: 'soil_SMOSMANIA_ISMN_2022.nc' #'soil_TERENO_ISMN_2022.nc' # #'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
+station: 'Condom' #'Gevenich'  #'Condom' ## 'Lahas' # CabrieresdAvignon, 'Narbonne' 'CreondArmagnac', 'LaGrandCombe', 'LezignanCorbieres', 'Mazan-Abbaye', 'Mejannes-le-Clap'...
 variable: 'sm'
 depth: [0.05, 0.2, 0.3]
 
@@ -28,8 +28,9 @@ years: [2021, 2022]
 models: ['mlp', 'lstm', "xgb"] # , 'xgb'
 
 initial_time: '2022-02-01T00:00:00'
-
-threshold: 3 # Kelvin, for soil temperature.
 maximum_leadtime: 40 # medium range 
 
 ensemble_size: 50
+
+score: "MAE"
+tolerance: 0.1 # %, for soil moisture.

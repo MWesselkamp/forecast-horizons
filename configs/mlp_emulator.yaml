@@ -93,6 +93,7 @@ devices: 2
 device: cpu
 
 model: "mlp"
+#model_path: "ecland-emulator/mlp/checkpoints" # /checkpoints/last.ckpt
 model_path: "../mlp/checkpoints" # /checkpoints/last.ckpt
 climatology_path: # "../analyses/climatology_6hrly_southern_england.nc"
 

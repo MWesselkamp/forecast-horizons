@@ -92,6 +92,7 @@ devices: 4
 device:
 
 model: "lstm"
+#model_path: "ecland-emulator/lstm/checkpoints"
 model_path: "../lstm/checkpoints"
 climatology_path: # "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"
 
