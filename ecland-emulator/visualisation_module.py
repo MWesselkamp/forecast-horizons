@@ -39,6 +39,7 @@ class VisualisationModule:
     def plot_station_data(self, y_prog, station_data, matching_indices):
 
         doy_vector = self.doy_vector[:self.maximum_leadtime]
+        step = len(doy_vector) // 4
 
         fig, ax = plt.subplots(3, 1, figsize=self.figsize, sharex=True, sharey=True) 
 
@@ -68,7 +69,7 @@ class VisualisationModule:
         ax[2].set_title("Subsurface Layer 2", **self.label_properties)
 
         for a in ax:
-            tick_positions = doy_vector[::10]  # Adjust frequency as needed
+            tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)
             a.set_xticklabels([pd.Timestamp(t).strftime('%Y-%m-%d') for t in tick_positions], rotation=25)
             a.set_ylabel(self.ylabel, **self.label_properties)
@@ -83,6 +84,7 @@ class VisualisationModule:
     def plot_station_data_and_forecast(self, dynamic_features_dict, dynamic_features_prediction_dict, station_data, matching_indices):
 
         doy_vector = self.doy_vector[:self.maximum_leadtime]
+        step = len(doy_vector) // 4
 
         fig, ax = plt.subplots(3, 1, figsize=self.figsize, sharex=True, sharey=True) 
 
@@ -124,7 +126,7 @@ class VisualisationModule:
         ax[2].set_title("Subsurface Layer 2", **self.label_properties)
 
         for a in ax:
-            tick_positions = doy_vector[::10]  # Adjust frequency as needed
+            tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)
             a.set_xticklabels([pd.Timestamp(t).strftime('%Y-%m-%d') for t in tick_positions], rotation=25)
             #a.set_xlabel(self.xlabel, **self.label_properties)
@@ -140,6 +142,7 @@ class VisualisationModule:
 
         if hod is None:
             doy_vector = self.doy_vector[:self.maximum_leadtime]
+            step = len(doy_vector) // 4
         else:
             doy_vector = self.doy_vector[:self.maximum_leadtime*4]
             doy_vector = doy_vector[::4]
@@ -177,7 +180,7 @@ class VisualisationModule:
             a.set_ylabel(f"{score}", **self.label_properties)
             if log_y:
                 a.set_yscale('log')
-            tick_positions = doy_vector[::10]  # Adjust frequency as needed
+            tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)
             a.set_xticklabels([pd.Timestamp(t).strftime('%Y-%m-%d') for t in tick_positions], rotation=25)
             plt.setp(a.get_yticklabels(), **self.tick_properties)
@@ -195,6 +198,7 @@ class VisualisationModule:
 
         if hod is None:
             doy_vector = self.doy_vector[:self.maximum_leadtime]
+            step = len(doy_vector) // 4
         else:
             doy_vector = self.doy_vector[:self.maximum_leadtime*4]
             doy_vector = doy_vector[::4]
@@ -234,7 +238,7 @@ class VisualisationModule:
             #a.legend(prop=self.legend_properties, frameon=False)
             if log_y:
                 a.set_yscale('log')
-            tick_positions = doy_vector[::10]  # Adjust frequency as needed
+            tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)
             a.set_xticklabels([pd.Timestamp(t).strftime('%Y-%m-%d') for t in tick_positions], rotation=25)
 
@@ -253,6 +257,7 @@ class VisualisationModule:
 
         if hod is None:
             doy_vector = self.doy_vector[:self.maximum_leadtime]
+            step = len(doy_vector) // 4
         else:
             doy_vector = self.doy_vector[:self.maximum_leadtime*4]
             doy_vector = doy_vector[::4]
@@ -298,11 +303,12 @@ class VisualisationModule:
                      color = "black", alpha = 0.8, linestyle = '--', linewidth = self.linewidth)
             #a.set_xlabel(x_label, **self.label_properties)
             a.set_ylabel(f"{score}-SS", **self.label_properties)
+            a.set_ylim(-1,1)
 
             #a.legend(prop=self.legend_properties, frameon=False)
             if log_y:
                 a.set_yscale('log')
-            tick_positions = doy_vector[::10]  # Adjust frequency as needed
+            tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)
             a.set_xticklabels([pd.Timestamp(t).strftime('%Y-%m-%d') for t in tick_positions], rotation=25)
 

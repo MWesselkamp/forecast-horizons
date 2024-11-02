@@ -29,10 +29,10 @@ SCRIPT_DIR = os.getcwd()
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR) 
 
-path_to_plots = 'ecland-emulator/plots'
-path_to_results = 'ecland-emulator/results'
+PATH_TO_PLOTS = 'ecland-emulator/plots'
+PATH_TO_RESULTS = 'ecland-emulator/results'
 
-EX_CONFIG = load_config(config_path = 'configs/smosmania_sm.yaml')
+EX_CONFIG = load_config(config_path = 'configs/tereno_st.yaml')
 
 print("Network: ", EX_CONFIG['network'])
 print("Station: ", EX_CONFIG['station'] )
@@ -113,12 +113,12 @@ if __name__ == "__main__":
                                 station = EX_CONFIG['station'] ,
                                 variable = EX_CONFIG['variable'],
                                 depth=EX_CONFIG['depth']) # Initialise the Observation Module with the default Station (Gevenich)
+    
 
     Station.load_station(years = EX_CONFIG['years']) # Load two years of station data for lookback slicing
     Station.load_forcing() # Load forcing for matching data base with station data
     closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
     Station.process_station_data() # specify path_to_plots, if you want to visualise
-
 
     dynamic_features_dict = {}
     dynamic_features_prediction_dict = {}
@@ -129,15 +129,15 @@ if __name__ == "__main__":
         #CONFIG, HPARS, ForecastModel = setup_experiment(model = mod)
         if mod == 'mlp':
             print('mlp')
-            CONFIG = load_config(config_path = 'configs/mlp_emulator.yaml')
+            CONFIG = load_config(config_path = 'configs/mlp_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
             ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG)    
         elif mod == 'lstm':
-            CONFIG = load_config(config_path = 'configs/lstm_emulator.yaml')
+            CONFIG = load_config(config_path = 'configs/lstm_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/lstm')
             ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG)
         elif mod == 'xgb':
-            CONFIG = load_config(config_path = 'configs/xgb_emulator.yaml')
+            CONFIG = load_config(config_path = 'configs/xgb_emulator_node.yaml')
             HPARS = None
             ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG)
 
@@ -171,32 +171,58 @@ if __name__ == "__main__":
     fc_emulators = dynamic_features_prediction_dict
     matching_indices = Station.match_indices(dataset=dataset,
                                                 target_variables=EX_CONFIG['targets_eval'])
-
     
 
-    layers = evaluate_ensemble(observations=station_data,
+    layers_ensemble = evaluate_ensemble(observations=station_data,
                     fc_numerical=fc_numerical,
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
                     maximum_leadtime= EX_CONFIG['maximum_leadtime'])
 
-    save_to =os.path.join(path_to_results, 
+    save_to =os.path.join(PATH_TO_RESULTS, 
                           f"{EX_CONFIG['network'].split('_')[1]}_{EX_CONFIG['station']}_{max(EX_CONFIG['years'])}_{EX_CONFIG['variable']}_ensemble.yaml")
     print("Write layers to path:", save_to)
 
     with open(save_to, 'w') as f:
-        yaml.dump(layers, f, indent=4)
+        yaml.dump(layers_ensemble, f, indent=4)
 
-    layers = evaluate_point(observations=station_data,
+    layers_point = evaluate_point(observations=station_data,
                     fc_numerical=fc_numerical,
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
                     maximum_leadtime= EX_CONFIG['maximum_leadtime'])
     
-    save_to =os.path.join(path_to_results, 
+    save_to =os.path.join(PATH_TO_RESULTS, 
                           f"{EX_CONFIG['network'].split('_')[1]}_{EX_CONFIG['station']}_{max(EX_CONFIG['years'])}_{EX_CONFIG['variable']}_point.yaml")
     print("Write layers to path:", save_to)
 
     with open(save_to, 'w') as f:
-        yaml.dump(layers, f, indent=4)
+        yaml.dump(layers_point, f, indent=4)
+
+    PointPlots = VisualisationModule(network = EX_CONFIG['network'],
+                                    station = EX_CONFIG['station'],
+                                    variable = EX_CONFIG['variable'],
+                                    maximum_leadtime=EX_CONFIG['maximum_leadtime'],
+                                    doy_vector = Station.doy_vector,
+                                    evaluation = "poi", # ens
+                                    path_to_plots=PATH_TO_PLOTS)
+    
+    EnsemblePlots = VisualisationModule(network = EX_CONFIG['network'],
+                                    station = EX_CONFIG['station'],
+                                    variable = EX_CONFIG['variable'],
+                                    maximum_leadtime=EX_CONFIG['maximum_leadtime'],
+                                    doy_vector = Station.doy_vector,
+                                    evaluation = "ens", # ens
+                                    path_to_plots=PATH_TO_PLOTS)
+    
+    PointPlots.plot_station_data_and_forecast(dynamic_features_dict, 
+                                              dynamic_features_prediction_dict, station_data,
+                                              matching_indices= matching_indices)
+    
+    EnsemblePlots.plot_scores(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
+                          score = "MAE", log_y=False)
+    EnsemblePlots.plot_skill_scores(layers_ensemble['layer0']['skill_scores'], layers_ensemble['layer1']['skill_scores'], layers_ensemble['layer2']['skill_scores'],
+                          score = "MAE", log_y=False, sharey = False, invert=True)
+    EnsemblePlots.plot_horizons(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
+                          score = "MAE", threshold = EX_CONFIG['tolerance'], hod=None, log_y=False)
 
