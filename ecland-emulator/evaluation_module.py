@@ -82,11 +82,10 @@ class EvaluationBasic:
         model_score = self.evaluate_emulator()
         return model_score[1:] - model_score[:-1]
 
+    @abstractmethod
     def get_skill_score(self):
 
-        model_score, _ = self.evaluate_emulator()
-        reference_score = self.evaluate_numerical()
-        return model_score/reference_score
+        pass
     
 
 class PointEvaluation(EvaluationBasic):
