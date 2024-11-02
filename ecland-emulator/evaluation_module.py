@@ -120,12 +120,15 @@ class PointEvaluation(EvaluationBasic):
         
         return mean_absolute_error(x_preds, x_ref)
     
-    def evaluate_stepwise(self, model = "numerical"):
-        
-        y_prog_prediction = self.fc_numerical if model == "numerical" else self.fc_emulator
-
+    def evaluate_numerical(self):
         eval_array = np.array([self.score(self.observations[t, :, np.newaxis], 
-                                          y_prog_prediction[t, :, np.newaxis]) for t in range(self.maximum_evaluation_time)])
+                                          self.fc_numerical[t, :, np.newaxis]) for t in range(self.maximum_evaluation_time)])
+        
+        return eval_array
+    
+    def evaluate_emulator(self):
+        eval_array = np.array([self.score(self.observations[t, :, np.newaxis], 
+                                          self.fc_emulator[t, :, np.newaxis]) for t in range(self.maximum_evaluation_time)])
         
         return eval_array
 
@@ -143,11 +146,13 @@ class EnsembleEvaluation(EvaluationBasic):
 
     def root_mean_squared_error(self, x_preds, x_ref):
 
-        return np.sqrt(np.square(np.subtract(x_preds, x_ref)).mean())
+        return np.sqrt(np.square(np.subtract(x_preds, x_ref)).mean()), None
     
     def mean_absolute_error(self, x_preds, x_ref):
 
-        return abs(np.subtract(x_preds, x_ref)).mean()
+        mae_mean = abs(np.subtract(x_preds, x_ref)).mean()
+        mae_dispersion = abs(np.subtract(x_preds, x_ref)).std()
+        return mae_mean, mae_dispersion
     
     def rmse(self, x_preds, x_ref, **kwargs):
 
@@ -157,7 +162,9 @@ class EnsembleEvaluation(EvaluationBasic):
         if np.isnan(x_preds).any() or np.isnan(x_ref).any():
            return torch.tensor(float('nan'))
         
-        return self.root_mean_squared_error(x_preds, x_ref)
+        mean_score, std_score = self.root_mean_squared_error(x_preds, x_ref)
+
+        return mean_score, std_score
     
     def mae(self, x_preds, x_ref, **kwargs):
 
@@ -167,18 +174,31 @@ class EnsembleEvaluation(EvaluationBasic):
         if np.isnan(x_preds).any() or np.isnan(x_ref).any():
            return torch.tensor(float('nan'))
         
-        return self.mean_absolute_error(x_preds, x_ref)
-    
-    def evaluate_stepwise(self, model):
+        mean_score, std_score = self.mean_absolute_error(x_preds, x_ref)
 
-        if model == "numerical":
-            eval_array = np.array([self.score(self.observations[t, :, np.newaxis], 
+        return mean_score, std_score
+    
+    def evaluate_numerical(self):
+
+        eval_array = np.array([self.score(self.observations[t, :, np.newaxis], 
                                           self.fc_numerical[t, :, np.newaxis]) for t in range(self.maximum_evaluation_time)])
-        else:
-            eval_array = np.array([self.score(self.observations.squeeze()[np.newaxis, t], 
-                                          self.fc_emulator[:, t]) for t in range(self.maximum_evaluation_time)])
-        
+
         return eval_array
+    
+    def evaluate_emulator(self):
+
+        eval_array_mean = []
+        eval_array_std = []
+
+        for t in range(self.maximum_evaluation_time):
+            scores_output = self.score(self.observations.squeeze()[np.newaxis, t], self.fc_emulator[:, t]) 
+            eval_array_mean.append(scores_output[0])
+            eval_array_std.append(scores_output[1])
+
+        eval_array_mean = np.array(eval_array_mean)
+        eval_array_std = np.array(eval_array_std)
+
+        return eval_array_mean, eval_array_std
     
 
 class EvaluationModule:

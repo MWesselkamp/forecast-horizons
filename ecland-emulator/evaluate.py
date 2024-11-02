@@ -59,18 +59,21 @@ def evaluate_ensemble(observations,
                                         fc_numerical=fc_numerical,
                                         fc_emulator=fc_emulators)
             EvaluateModel.subset_samples()
-            ensemble_score = EvaluateModel.evaluate_stepwise(model = "emulator")
-            numerical_score = EvaluateModel.evaluate_stepwise(model = "numerical")
+            ensemble_score = EvaluateModel.evaluate_emulator()
+            numerical_score = EvaluateModel.evaluate_numerical()
             ensemble_skill = EvaluateModel.get_skill_score()
 
             scores = {}
+            scores_dispersion = {}
             skill_scores = {}
             scores["ECLand"] = numerical_score
-            scores["Emulators"] = ensemble_score
+            scores["Emulators"] = ensemble_score[0]
+            scores_dispersion["Emulators"] = ensemble_score[1]
             skill_scores["Emulators"] = ensemble_skill
 
             layers[f"layer{layer}"] = {}
             layers[f"layer{layer}"]["scores"] = scores
+            layers[f"layer{layer}"]["scores_dispersion"] = scores_dispersion
             layers[f"layer{layer}"]["skill_scores"] = skill_scores
 
         return layers
@@ -96,8 +99,8 @@ def evaluate_point(observations,
                                         fc_numerical=fc_numerical,
                                         fc_emulator=fc_emulator)
                 EvaluateModel.subset_samples()
-                scores["ecland"] = EvaluateModel.evaluate_stepwise(model = "numerical")
-                scores[mod] = EvaluateModel.evaluate_stepwise(model = mod)
+                scores["ecland"] = EvaluateModel.evaluate_numerical()
+                scores[mod] = EvaluateModel.evaluate_emulator()
                 skill_scores[mod] = EvaluateModel.get_skill_score()
                 
             layers[f"layer{layer}"] = {}

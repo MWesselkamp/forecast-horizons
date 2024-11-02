@@ -37,7 +37,8 @@ class EcDataset(Dataset):
         self, 
         config,
         start_yr,
-        end_yr
+        end_yr,
+        initial_time
     ):
         
         self.x_idxs=config["x_slice_indices"]
