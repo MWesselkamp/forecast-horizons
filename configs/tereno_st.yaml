@@ -28,9 +28,9 @@ years: [2021, 2022]
 models: ['mlp', 'lstm', "xgb"] # , 'xgb'
 
 initial_time: '2022-02-01T00:00:00'
-maximum_leadtime: 1330 # long-range 
+maximum_leadtime: 120 # long-range 
 
 ensemble_size: 50
 
 score: "MAE"
-tolerance: 3 # Kelvin, for soil temperature. 0.1 in % for SM
+tolerance: 1.5 # Kelvin, for soil temperature. 0.1 in % for SM

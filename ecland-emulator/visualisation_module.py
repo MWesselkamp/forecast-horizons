@@ -194,7 +194,8 @@ class VisualisationModule:
         plt.savefig(fig_path)
         plt.show()
 
-    def plot_horizons(self, scores_l1, scores_l2, scores_3, score, threshold, hod = None, log_y=True):
+    def plot_horizons(self, scores_l1, scores_l2, scores_l3, score, threshold,
+                      scores_l1_std = None, scores_l2_std = None, scores_l3_std = None, hod = None, log_y=True):
 
         if hod is None:
             doy_vector = self.doy_vector[:self.maximum_leadtime]
@@ -207,19 +208,40 @@ class VisualisationModule:
 
         x_label = self.xlabel if hod is None else "Lead time [day]"
         colors = ["cyan", "magenta", "purple", "pink"]
+        
         i = 0
         for model, scores in scores_l1.items():
-            ax[0].plot(doy_vector, threshold - scores, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
+            shifted_score = threshold - scores
+            if (scores_l1_std is not None) and (model in scores_l1_std.keys()):
+                scores_std = scores_l1_std[model]
+                upper = shifted_score + 4.3*scores_std
+                lower = shifted_score - 4.3*scores_std
+                ax[0].fill_between(doy_vector, upper, lower, color = colors[i], alpha = 0.2)
+
+            ax[0].plot(doy_vector, shifted_score, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
             i += 1
         ax[0].legend(prop=self.legend_properties, frameon=True)
 
         i = 0
         for model, scores in scores_l2.items():
+            shifted_score = threshold - scores
+            if (scores_l2_std is not None) and (model in scores_l2_std.keys()):
+                scores_std = scores_l2_std[model]
+                upper = shifted_score + 4.3*scores_std
+                lower = shifted_score - 4.3*scores_std
+                ax[1].fill_between(doy_vector, upper, lower, color = colors[i], alpha = 0.2)
+
             ax[1].plot(doy_vector, threshold - scores, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
             i += 1
 
         i = 0
-        for model, scores in scores_3.items():
+        for model, scores in scores_l3.items():
+            shifted_score = threshold - scores
+            if (scores_l3_std is not None) and (model in scores_l3_std.keys()):
+                scores_std = scores_l3_std[model]
+                upper = shifted_score + 4.3*scores_std
+                lower = shifted_score - 4.3*scores_std
+                ax[2].fill_between(doy_vector, upper, lower, color = colors[i], alpha = 0.2)
             ax[2].plot(doy_vector, threshold - scores, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
             i += 1
         ax[2].set_xlabel(x_label, **self.label_properties)

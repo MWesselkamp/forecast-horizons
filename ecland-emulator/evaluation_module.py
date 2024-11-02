@@ -79,13 +79,13 @@ class EvaluationBasic:
     
     def get_score_increments(self):
         
-        model_score = self.evaluate_stepwise(model="emulator")
+        model_score = self.evaluate_emulator()
         return model_score[1:] - model_score[:-1]
 
     def get_skill_score(self):
 
-        model_score = self.evaluate_stepwise(model="emulator")
-        reference_score = self.evaluate_stepwise(model="numerical")
+        model_score, _ = self.evaluate_emulator()
+        reference_score = self.evaluate_numerical()
         return model_score/reference_score
     
 
@@ -132,6 +132,11 @@ class PointEvaluation(EvaluationBasic):
         
         return eval_array
 
+    def get_skill_score(self):
+
+        model_score = self.evaluate_emulator()
+        reference_score = self.evaluate_numerical()
+        return model_score/reference_score
 
 class EnsembleEvaluation(EvaluationBasic):
 
@@ -142,7 +147,9 @@ class EnsembleEvaluation(EvaluationBasic):
         self.fc_emulator = np.stack(
             [emulator[:self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]] for key, emulator in self.fc_emulator.items()]
         )
-        print("Shape of subset: ", self.fc_emulator.shape)
+        print("Shape of subset fc_emulator: ", self.fc_emulator.shape)
+        print("Shape of subset observations: ", self.observations.shape)
+        print("Shape of subset fc_numerical: ", self.fc_numerical.shape)
 
     def root_mean_squared_error(self, x_preds, x_ref):
 
@@ -180,10 +187,19 @@ class EnsembleEvaluation(EvaluationBasic):
     
     def evaluate_numerical(self):
 
-        eval_array = np.array([self.score(self.observations[t, :, np.newaxis], 
-                                          self.fc_numerical[t, :, np.newaxis]) for t in range(self.maximum_evaluation_time)])
+        eval_array = []
 
-        return eval_array
+        for t in range(self.maximum_evaluation_time):
+            score_result = self.score(self.observations[t, :, np.newaxis], self.fc_numerical[t, :, np.newaxis])
+
+            if isinstance(score_result, tuple):
+                mean_score, _ = score_result  # Unpack the tuple
+            else:
+                mean_score = score_result 
+    
+            eval_array.append(mean_score)
+        
+        return np.array(eval_array)
     
     def evaluate_emulator(self):
 
@@ -191,14 +207,27 @@ class EnsembleEvaluation(EvaluationBasic):
         eval_array_std = []
 
         for t in range(self.maximum_evaluation_time):
-            scores_output = self.score(self.observations.squeeze()[np.newaxis, t], self.fc_emulator[:, t]) 
-            eval_array_mean.append(scores_output[0])
-            eval_array_std.append(scores_output[1])
+            score_result = self.score(self.observations.squeeze()[np.newaxis, t], self.fc_emulator[:, t]) 
+            
+            if isinstance(score_result, tuple):
+                mean_score, std_score = score_result  # Unpack the tuple
+                eval_array_std.append(std_score)      # Append std_score only if it exists
+            else:
+                mean_score = score_result
+                eval_array_std.append(None)                # Set to None if no standard deviation is provided
 
+            eval_array_mean.append(mean_score)
+        
         eval_array_mean = np.array(eval_array_mean)
-        eval_array_std = np.array(eval_array_std)
+        eval_array_std = np.array(eval_array_std) if eval_array_std is not None else None
 
         return eval_array_mean, eval_array_std
+    
+    def get_skill_score(self):
+
+        model_score, _ = self.evaluate_emulator()
+        reference_score = self.evaluate_numerical()
+        return model_score/reference_score
     
 
 class EvaluationModule:

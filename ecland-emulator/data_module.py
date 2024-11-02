@@ -75,9 +75,14 @@ class EcDataset(Dataset):
             else:
                 raise KeyError("The 'time' variable does not have a 'units' attribute and direct conversion failed.")
 
-        self.start_index = min(np.argwhere(date_times.year == int(start_yr)))[0]
-        self.start_index_lagged = max(np.argwhere(date_times.year == (int(start_yr)-1)))[0] - self.lookback # create a lagged time index for lstm
+        # Convert the specific initial time to datetime
+        initial_time_dt = pd.to_datetime(initial_time)
+
+        self.start_index = (np.abs(date_times - initial_time_dt)).argmin()
+        self.start_index_lagged = self.start_index - self.lookback 
+
         self.end_index = max(np.argwhere(date_times.year == int(end_yr)))[0]
+
         print("Temporal start index", self.start_index, "Temporal end index", self.end_index)
         print("Temporal lagged start index", self.start_index_lagged)
 

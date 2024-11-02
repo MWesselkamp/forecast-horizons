@@ -129,10 +129,10 @@ class ObservationModule:
         t_lookback_index = t_0_index - lookback
         print("Subtract lookback for new index:", t_lookback_index)
 
-        variable_data_slice = self.variable_data.isel(time=slice(t_lookback_index, None))
+        self.variable_data_slice = self.variable_data.isel(time=slice(t_lookback_index, None))
         # create a doy vector for plotting.
-        self.doy_vector = variable_data_slice['time'].values
-        variable_data_tensor = torch.tensor(variable_data_slice.values, dtype=torch.float32)
+        self.doy_vector = self.variable_data_slice['time'].values
+        variable_data_tensor = torch.tensor(self.variable_data_slice.values, dtype=torch.float32)
         
         return variable_data_tensor
     
