@@ -15,7 +15,7 @@ from forecast_module import *
 from observation_module import *
 from visualisation_module import *
 
-from helpers import *
+from misc.helpers import *
 from tests.test_model import *
 
 set_global_seed(42)
@@ -24,6 +24,11 @@ SCRIPT_DIR = os.getcwd()
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR) 
 
+parser = argparse.ArgumentParser(description="Load different config files for training.")
+parser.add_argument('--maximum_leadtime', type=int, nargs='?', const=56, help='Specify maximum lead time (6-hourly). Default: two weeks')
+args = parser.parse_args()
+
+MAXIMUM_LEADTIME = args.maximum_leadtime
 PATH_TO_PLOTS = 'ecland-emulator/plots/'
 EX_STATION = "Condom"
 EX_CONFIG = load_config(config_path = 'configs/smosmania_st.yaml')
@@ -62,7 +67,7 @@ PlotStations = VisualisationMany(
                  network = EX_CONFIG["network"], 
                  station = "all", 
                  variable = EX_CONFIG["variable"], 
-                 maximum_leadtime = EX_CONFIG["maximum_leadtime"], 
+                 maximum_leadtime = MAXIMUM_LEADTIME, 
                  score = EX_CONFIG["score"],
                  doy_vector = DOY_VECTOR,
                  evaluation = "ens", 

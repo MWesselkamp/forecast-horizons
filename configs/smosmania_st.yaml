@@ -20,7 +20,7 @@ path_to_plots:  'ecland-emulator/plots/'
 path_to_results: 'ecland-emulator/results/'
 
 network: 'soil_SMOSMANIA_ISMN_2022.nc' #'soil_TERENO_ISMN_2022.nc' # #'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
-station: 'Condom' #'Gevenich'  #'Condom' ## 'Lahas' # CabrieresdAvignon, 'Narbonne' 'CreondArmagnac', 'LaGrandCombe', 'LezignanCorbieres', 'Mazan-Abbaye', 'Mejannes-le-Clap'...
+station: 'LaGrandCombe' #'Gevenich'  #'Condom' ## 'Lahas' # CabrieresdAvignon, 'Narbonne' 'CreondArmagnac', 'LaGrandCombe', 'LezignanCorbieres', 'Mazan-Abbaye', 'Mejannes-le-Clap'...
 variable: 'st'
 depth: [0.05, 0.2, 0.3]
 

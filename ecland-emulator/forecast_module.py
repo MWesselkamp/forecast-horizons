@@ -9,7 +9,7 @@ import time
 import torch
 
 from torch import tensor
-from models import *
+from misc.models import *
 from data_module import *
 from abc import ABC, abstractmethod
 from tests.test_model import *

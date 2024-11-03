@@ -20,7 +20,7 @@ from forecast_module import *
 from observation_module import *
 from visualisation_module import *
 
-from helpers import *
+from misc.helpers import *
 from tests.test_model import *
 
 set_global_seed(42)
@@ -33,15 +33,24 @@ def nullable_string(val):
     return None if not val else val
 
 parser = argparse.ArgumentParser(description="Load different config files for training.")
-parser.add_argument('--station', type=nullable_string, help='Specify .yaml file from same directory.')
+parser.add_argument('--station', type=nullable_string, help='Station name.')
+parser.add_argument('--variable', type=nullable_string, help='Specify variable from st or sm.')
+parser.add_argument('--maximum_leadtime', type=int, nargs='?', const=56, help='Specify maximum lead time (6-hourly). Default: two weeks')
+parser.add_argument('--make_plots', type=bool, nargs='?', const=False, help='Specify maximum lead time (6-hourly).')
 args = parser.parse_args()
 
 STATION = args.station
+VARIABLE = args.variable
+MAXIMUM_LEADTIME = args.maximum_leadtime
+MAKE_PLOTS = args.make_plots
 
 PATH_TO_PLOTS = 'ecland-emulator/plots'
 PATH_TO_RESULTS = 'ecland-emulator/results'
 
-EX_CONFIG = load_config(config_path = 'configs/smosmania_st.yaml')
+if STATION == "Gevenich":
+    EX_CONFIG = load_config(config_path = 'configs/tereno_st.yaml')
+else:
+    EX_CONFIG = load_config(config_path = 'configs/smosmania_st.yaml')
 
 print("Network: ", EX_CONFIG['network'])
 print("Station: ", STATION)
@@ -135,7 +144,7 @@ if __name__ == "__main__":
 
     Station = ObservationModule(network = EX_CONFIG['network'], 
                                 station = STATION ,
-                                variable = EX_CONFIG['variable'],
+                                variable = VARIABLE,
                                 depth=EX_CONFIG['depth']) # Initialise the Observation Module with the default Station (Gevenich)
     
 
@@ -201,17 +210,17 @@ if __name__ == "__main__":
                     fc_numerical=fc_numerical,
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
-                    maximum_leadtime= EX_CONFIG['maximum_leadtime'])
+                    maximum_leadtime= MAXIMUM_LEADTIME)
 
     save_to =os.path.join(PATH_TO_RESULTS, 
-                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{EX_CONFIG['variable']}_ensemble.yaml")
+                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_ensemble.yaml")
     print("Write layers to path:", save_to)
 
     with open(save_to, 'w') as f:
         yaml.dump(layers_ensemble, f, indent=4)
 
     save_to =os.path.join(PATH_TO_RESULTS, 
-                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{EX_CONFIG['variable']}_ensemble_fc.yaml")
+                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_ensemble_fc.yaml")
     print("Write forecasts to path:", save_to)
 
     with open(save_to, 'w') as f:
@@ -221,39 +230,46 @@ if __name__ == "__main__":
                     fc_numerical=fc_numerical,
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
-                    maximum_leadtime= EX_CONFIG['maximum_leadtime'])
+                    maximum_leadtime= MAXIMUM_LEADTIME)
     
     save_to =os.path.join(PATH_TO_RESULTS, 
-                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{EX_CONFIG['variable']}_point.yaml")
+                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_point.yaml")
     print("Write layers to path:", save_to)
 
     with open(save_to, 'w') as f:
         yaml.dump(layers_point, f, indent=4)
 
-    PointPlots = VisualisationSingle(network = EX_CONFIG['network'],
-                                    station = EX_CONFIG['station'],
-                                    variable = EX_CONFIG['variable'],
-                                    maximum_leadtime=EX_CONFIG['maximum_leadtime'],
-                                    doy_vector = Station.doy_vector,
-                                    evaluation = "poi", # ens
-                                    path_to_plots=PATH_TO_PLOTS)
-    #
-    #EnsemblePlots = VisualisationModule(network = EX_CONFIG['network'],
-    #                                station = EX_CONFIG['station'],
-    #                                variable = EX_CONFIG['variable'],
-    #                                maximum_leadtime=EX_CONFIG['maximum_leadtime'],
-    #                                doy_vector = Station.doy_vector,
-    #                                evaluation = "ens", # ens
-    #                                path_to_plots=PATH_TO_PLOTS)
-    
-    PointPlots.plot_station_data_and_forecast(dynamic_features_dict, 
-                                              dynamic_features_prediction_dict, station_data,
-                                              matching_indices= matching_indices)
-    #
-    #EnsemblePlots.plot_scores(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
-    #                      score = "MAE", log_y=False)
-    #EnsemblePlots.plot_skill_scores(layers_ensemble['layer0']['skill_scores'], layers_ensemble['layer1']['skill_scores'], layers_ensemble['layer2']['skill_scores'],
-    #                      score = "MAE", log_y=False, sharey = False, invert=True)
-    #EnsemblePlots.plot_horizons(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
-    #                      score = "MAE", threshold = EX_CONFIG['tolerance'], hod=None, log_y=False)
+    if MAKE_PLOTS:
+        print("Making plots!")
+
+        PointPlots = VisualisationSingle(network = EX_CONFIG['network'],
+                                        station = STATION,
+                                        variable = VARIABLE,
+                                        score = EX_CONFIG["score"],
+                                        maximum_leadtime=MAXIMUM_LEADTIME,
+                                        doy_vector = Station.doy_vector,
+                                        evaluation = "poi", # ens
+                                        path_to_plots=PATH_TO_PLOTS)
+        
+        EnsemblePlots = VisualisationSingle(network = EX_CONFIG['network'],
+                                        station = STATION,
+                                        variable = VARIABLE,
+                                        score = EX_CONFIG["score"],
+                                        maximum_leadtime=MAXIMUM_LEADTIME,
+                                        doy_vector = Station.doy_vector,
+                                        evaluation = "ens", # ens
+                                        path_to_plots=PATH_TO_PLOTS)
+        
+        PointPlots.plot_station_data_and_forecast(dynamic_features_dict, 
+                                                dynamic_features_prediction_dict, station_data,
+                                                matching_indices= matching_indices)
+        
+        EnsemblePlots.plot_scores(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'], log_y=False)
+        EnsemblePlots.plot_skill_scores(layers_ensemble['layer0']['skill_scores'], layers_ensemble['layer1']['skill_scores'], layers_ensemble['layer2']['skill_scores'], 
+                                        log_y=False, sharey = False, invert=True)
+        EnsemblePlots.plot_horizons(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
+                                    scores_l1_std = layers_ensemble['layer0']['scores_dispersion'], 
+                                    scores_l2_std = layers_ensemble['layer1']['scores_dispersion'], 
+                                    scores_l3_std = layers_ensemble['layer2']['scores_dispersion'],
+                                    threshold = EX_CONFIG['tolerance'], hod=None, log_y=False)
 

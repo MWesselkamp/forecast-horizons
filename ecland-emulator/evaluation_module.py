@@ -15,7 +15,7 @@ print(SCRIPT_DIR)
 from abc import ABC, abstractmethod
 from matplotlib.colors import BoundaryNorm
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, root_mean_squared_error
-from helpers import r2_score_multi, anomaly_correlation, standardized_anomaly
+from misc.helpers import r2_score_multi, anomaly_correlation, standardized_anomaly
 
 
 class EvaluationBasic:

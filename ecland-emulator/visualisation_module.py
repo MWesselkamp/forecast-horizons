@@ -367,18 +367,18 @@ class VisualisationSingle(VisualisationClass):
             for i in range(ens_size):
                 ax[0].plot(doy_vector, ensemble_prediction[i, :,3], color=colors[j], alpha = 0.3)
             j+=1
-        ax[0].plot(doy_vector, ensemble_prediction[...,3].mean(axis=0), color="magenta", alpha = 0.5,label="Emulator", linewidth = self.linewidth)
-        ax[0].plot(doy_vector, fc_numerical[:,3], color="cyan", label="ECLand", alpha = 0.5, linewidth = self.linewidth)
-        ax[0].plot(doy_vector, observations[:,:,0], color="lime", label="Gevenich", alpha = 0.5, linewidth = self.linewidth)
+        ax[0].plot(doy_vector, ensemble_prediction[...,3].mean(axis=0), color="magenta", alpha = 0.7,label="AILand Ensemble Mean", linewidth = self.linewidth)
+        ax[0].plot(doy_vector, fc_numerical[:,3], color="cyan", label="ECLand", alpha = 0.7, linewidth = self.linewidth)
+        ax[0].plot(doy_vector, observations[:,:,0], color="lime", label=self.station, alpha = 0.7, linewidth = self.linewidth)
 
         j=0
         for key, ensemble_prediction in ensemble_dict.items():
             for i in range(ens_size):
                 ax[1].plot(doy_vector, ensemble_prediction[i, :,4], color=colors[j],  alpha = 0.3)
             j+=1
-        ax[1].plot(doy_vector, ensemble_prediction[...,4].mean(axis=0), color="magenta", alpha = 0.5,label="Emulator", linewidth = self.linewidth)
-        ax[1].plot(doy_vector, fc_numerical[:,4], color="cyan", label="ECLand", alpha = 0.9, linewidth = self.linewidth)
-        ax[1].plot(doy_vector, observations[:,:,1], color="lime", label="Gevenich", alpha = 0.9, linewidth = self.linewidth)
+        ax[1].plot(doy_vector, ensemble_prediction[...,4].mean(axis=0), color="magenta", alpha = 0.7,label="AILand Ensemble Mean", linewidth = self.linewidth)
+        ax[1].plot(doy_vector, fc_numerical[:,4], color="cyan", label="ECLand", alpha = 0.7, linewidth = self.linewidth)
+        ax[1].plot(doy_vector, observations[:,:,1], color="lime", label=self.station, alpha = 0.7, linewidth = self.linewidth)
         ax[1].legend(prop=self.legend_properties, frameon=True)
 
         j=0
@@ -386,9 +386,9 @@ class VisualisationSingle(VisualisationClass):
             for i in range(ens_size):
                 ax[2].plot(doy_vector, ensemble_prediction[i, :,5], color=colors[j], alpha = 0.3)
             j+=1
-        ax[2].plot(doy_vector, ensemble_prediction[...,5].mean(axis=0), color="magenta", alpha = 0.5,label="Emulator", linewidth = self.linewidth)
-        ax[2].plot(doy_vector, fc_numerical[:,5], color="cyan", label="ECLand", alpha = 0.5, linewidth = self.linewidth)
-        ax[2].plot(doy_vector, observations[:,:,2], color="lime", label="Gevenich", alpha = 0.5, linewidth = self.linewidth) 
+        ax[2].plot(doy_vector, ensemble_prediction[...,5].mean(axis=0), color="magenta", alpha = 0.7,label="AILand Ensemble Mean", linewidth = self.linewidth)
+        ax[2].plot(doy_vector, fc_numerical[:,5], color="cyan", label="ECLand", alpha = 0.7, linewidth = self.linewidth)
+        ax[2].plot(doy_vector, observations[:,:,2], color="lime", label=self.station, alpha = 0.7, linewidth = self.linewidth) 
 
         for a in ax:
             a.set_xlabel(self.xlabel, **self.label_properties)
