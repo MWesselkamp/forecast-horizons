@@ -57,7 +57,11 @@ def evaluate_ensemble(observations,
                 fc_emulators,
                 score, 
                 maximum_leadtime):
+        
         layers = {}
+        forecasts = {}
+        save_data = ["observations", "fc_numerical", "fc_emulators"]
+
         for layer in [0,1,2]:
             EvaluateModel = EnsembleEvaluation(score =  score,
                                                 layer_index = layer,
@@ -67,7 +71,11 @@ def evaluate_ensemble(observations,
             EvaluateModel.set_samples(observations=observations,
                                 fc_numerical=fc_numerical,
                                 fc_emulator=fc_emulators)
-            EvaluateModel.subset_samples()
+            subsetted_data = EvaluateModel.subset_samples()
+            print(subsetted_data[0].shape)
+            print(subsetted_data[1].shape)
+            print(subsetted_data[2].shape)
+            forecasts[f"layer{layer}"] = dict(zip(save_data, subsetted_data))
             numerical_score = EvaluateModel.evaluate_numerical()
             ensemble_score = EvaluateModel.evaluate_emulator()
             ensemble_skill = EvaluateModel.get_skill_score()
@@ -85,7 +93,7 @@ def evaluate_ensemble(observations,
             layers[f"layer{layer}"]["scores_dispersion"] = scores_dispersion
             layers[f"layer{layer}"]["skill_scores"] = skill_scores
 
-        return layers
+        return layers, forecasts
 
 
 def evaluate_point(observations, 
@@ -189,7 +197,7 @@ if __name__ == "__main__":
                                                 target_variables=EX_CONFIG['targets_eval'])
     
 
-    layers_ensemble = evaluate_ensemble(observations=station_data,
+    layers_ensemble, forecast_ensemble = evaluate_ensemble(observations=station_data,
                     fc_numerical=fc_numerical,
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
@@ -201,6 +209,13 @@ if __name__ == "__main__":
 
     with open(save_to, 'w') as f:
         yaml.dump(layers_ensemble, f, indent=4)
+
+    save_to =os.path.join(PATH_TO_RESULTS, 
+                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{EX_CONFIG['variable']}_ensemble_fc.yaml")
+    print("Write forecasts to path:", save_to)
+
+    with open(save_to, 'w') as f:
+        yaml.dump(forecast_ensemble, f, indent=4)
 
     layers_point = evaluate_point(observations=station_data,
                     fc_numerical=fc_numerical,
@@ -215,13 +230,13 @@ if __name__ == "__main__":
     with open(save_to, 'w') as f:
         yaml.dump(layers_point, f, indent=4)
 
-    #PointPlots = VisualisationModule(network = EX_CONFIG['network'],
-    #                                station = EX_CONFIG['station'],
-    #                                variable = EX_CONFIG['variable'],
-    #                                maximum_leadtime=EX_CONFIG['maximum_leadtime'],
-    #                                doy_vector = Station.doy_vector,
-    #                                evaluation = "poi", # ens
-    #                                path_to_plots=PATH_TO_PLOTS)
+    PointPlots = VisualisationSingle(network = EX_CONFIG['network'],
+                                    station = EX_CONFIG['station'],
+                                    variable = EX_CONFIG['variable'],
+                                    maximum_leadtime=EX_CONFIG['maximum_leadtime'],
+                                    doy_vector = Station.doy_vector,
+                                    evaluation = "poi", # ens
+                                    path_to_plots=PATH_TO_PLOTS)
     #
     #EnsemblePlots = VisualisationModule(network = EX_CONFIG['network'],
     #                                station = EX_CONFIG['station'],
@@ -231,9 +246,9 @@ if __name__ == "__main__":
     #                                evaluation = "ens", # ens
     #                                path_to_plots=PATH_TO_PLOTS)
     
-    #PointPlots.plot_station_data_and_forecast(dynamic_features_dict, 
-    #                                          dynamic_features_prediction_dict, station_data,
-    #                                          matching_indices= matching_indices)
+    PointPlots.plot_station_data_and_forecast(dynamic_features_dict, 
+                                              dynamic_features_prediction_dict, station_data,
+                                              matching_indices= matching_indices)
     #
     #EnsemblePlots.plot_scores(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
     #                      score = "MAE", log_y=False)

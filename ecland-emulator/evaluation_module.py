@@ -150,6 +150,8 @@ class EnsembleEvaluation(EvaluationBasic):
         print("Shape of subset observations: ", self.observations.shape)
         print("Shape of subset fc_numerical: ", self.fc_numerical.shape)
 
+        return [self.observations,self.fc_numerical, self.fc_emulator]
+    
     def root_mean_squared_error(self, x_preds, x_ref):
 
         return np.sqrt(np.square(np.subtract(x_preds, x_ref)).mean()), None
