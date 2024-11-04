@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 parent_dir = os.path.abspath('..')
 sys.path.append(parent_dir)
 
-from data_module import *
-from evaluation_module import *
-from forecast_module import *
-from observation_module import *
-from visualisation_module import *
+from modules.data_module import *
+from modules.evaluation_module import *
+from modules.forecast_module import *
+from modules.observation_module import *
+from modules.visualisation_module import *
 
 from misc.helpers import *
 from tests.test_model import *
@@ -49,7 +49,7 @@ print("Years: ", years)
 print("Models: ", models)
 print("Initial time: ", EX_CONFIG['initial_time'])
 
-def perturb_initial_state(initial_state, perturbation_factor = 0.001):
+def perturb_initial_state(initial_state, perturbation_factor = 0.08):
     random_perturbation = torch.rand(initial_state.size()) * 2 - 1  # random values between -1 and 1
     return initial_state * (1 + perturbation_factor * random_perturbation)
 
@@ -77,15 +77,15 @@ if __name__ == "__main__":
 
         if mod == 'mlp':
             print('mlp')
-            CONFIG = load_config(config_path = 'configs/mlp_emulator.yaml')
+            CONFIG = load_config(config_path = 'configs/mlp_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
             ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG)    
         elif mod == 'lstm':
-            CONFIG = load_config(config_path = 'configs/lstm_emulator.yaml')
+            CONFIG = load_config(config_path = 'configs/lstm_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/lstm')
             ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG)
         elif mod == 'xgb':
-            CONFIG = load_config(config_path = 'configs/xgb_emulator.yaml')
+            CONFIG = load_config(config_path = 'configs/xgb_emulator_node.yaml')
             HPARS = None
             ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG)
 

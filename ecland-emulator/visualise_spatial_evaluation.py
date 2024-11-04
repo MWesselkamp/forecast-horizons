@@ -9,11 +9,11 @@ import argparse
 parent_dir = os.path.abspath('..')
 sys.path.append(parent_dir)
 
-from data_module import *
-from evaluation_module import *
-from forecast_module import *
-from observation_module import *
-from visualisation_module import *
+from modules.data_module import *
+from modules.evaluation_module import *
+from modules.forecast_module import *
+from modules.observation_module import *
+from modules.visualisation_module import *
 
 from misc.helpers import *
 from tests.test_model import *

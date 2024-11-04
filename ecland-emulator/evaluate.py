@@ -14,11 +14,11 @@ import argparse
 parent_dir = os.path.abspath('..')
 sys.path.append(parent_dir)
 
-from data_module import *
-from evaluation_module import *
-from forecast_module import *
-from observation_module import *
-from visualisation_module import *
+from modules.data_module import *
+from modules.evaluation_module import *
+from modules.forecast_module import *
+from modules.observation_module import *
+from modules.visualisation_module import *
 
 from misc.helpers import *
 from tests.test_model import *
@@ -37,12 +37,14 @@ parser.add_argument('--station', type=nullable_string, help='Station name.')
 parser.add_argument('--variable', type=nullable_string, help='Specify variable from st or sm.')
 parser.add_argument('--maximum_leadtime', type=int, nargs='?', const=56, help='Specify maximum lead time (6-hourly). Default: two weeks')
 parser.add_argument('--make_plots', type=bool, nargs='?', const=False, help='Specify maximum lead time (6-hourly).')
+parser.add_argument('--initial_time', type=nullable_string, nargs='?', const='2022-02-01T00:00:00',  help='Specify variable from st or sm.')
 args = parser.parse_args()
 
 STATION = args.station
 VARIABLE = args.variable
 MAXIMUM_LEADTIME = args.maximum_leadtime
 MAKE_PLOTS = args.make_plots
+INITIAL_TIME = args.initial_time
 
 PATH_TO_PLOTS = 'ecland-emulator/plots'
 PATH_TO_RESULTS = 'ecland-emulator/results'
@@ -103,6 +105,34 @@ def evaluate_ensemble(observations,
             layers[f"layer{layer}"]["skill_scores"] = skill_scores
 
         return layers, forecasts
+
+
+def ensemble_horizon(stations_dict, maximum_leadtime, doy_vector):
+
+    PlotStations = VisualisationMany(
+                 network = EX_CONFIG["network"], 
+                 station = "all", 
+                 variable = EX_CONFIG["variable"], 
+                 maximum_leadtime = maximum_leadtime, 
+                 score = EX_CONFIG["score"],
+                 doy_vector = doy_vector,
+                 evaluation = "ens", 
+                 path_to_plots = PATH_TO_PLOTS
+    )
+
+    PlotStations.assemble_scores(stations_dict)
+
+    layers = {}
+
+    for layer, scores in enumerate([PlotStations.scores_l1, PlotStations.scores_l2, PlotStations.scores_l3]):
+
+        layers[f"layer{layer}"] = {}
+
+        layers[f"layer{layer}"]["h_upper"] = np.argmax((1 - scores["skill_scores_upper"]) < 0)
+        layers[f"layer{layer}"]["h_mean"] = np.argmax((1 - scores["skill_scores_mean"]) < 0)
+        layers[f"layer{layer}"]["h_lower"] = np.argmax((1 - scores["skill_scores_lower"]) < 0)
+
+    return layers
 
 
 def evaluate_point(observations, 
@@ -176,12 +206,12 @@ if __name__ == "__main__":
 
         CONFIG['x_slice_indices'] = closest_grid_cell # adjust the index of the grid cell in the config file before initialising the models
 
-        dataset = ForecastModel.initialise_dataset(EX_CONFIG['initial_time'])
+        dataset = ForecastModel.initialise_dataset(INITIAL_TIME)
         model = ForecastModel.load_model()
         x_static, x_met, y_prog, y_prog_initial_state = ForecastModel.load_test_data(dataset)  
 
         station_data = Station.slice_station_data(lookback=CONFIG["lookback"],
-                                    t_0=EX_CONFIG['initial_time'])
+                                    t_0=INITIAL_TIME)
         matching_indices = Station.match_indices(dataset=dataset,
                                                 target_variables=EX_CONFIG['targets_eval'])
 
@@ -212,6 +242,10 @@ if __name__ == "__main__":
                     score=EX_CONFIG['score'] ,
                     maximum_leadtime= MAXIMUM_LEADTIME)
 
+    layers_horizons = ensemble_horizon(stations_dict = layers_ensemble, 
+                                       maximum_leadtime = MAXIMUM_LEADTIME, 
+                                       doy_vector = Station.doy_vector)
+    
     save_to =os.path.join(PATH_TO_RESULTS, 
                           f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_ensemble.yaml")
     print("Write layers to path:", save_to)
@@ -225,6 +259,13 @@ if __name__ == "__main__":
 
     with open(save_to, 'w') as f:
         yaml.dump(forecast_ensemble, f, indent=4)
+
+    save_to =os.path.join(PATH_TO_RESULTS, 
+                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_ensemble_horizons.yaml")
+    print("Write forecasts to path:", save_to)
+
+    with open(save_to, 'w') as f:
+        yaml.dump(layers_horizons, f, indent=4)
 
     layers_point = evaluate_point(observations=station_data,
                     fc_numerical=fc_numerical,
