@@ -260,7 +260,7 @@ class VisualisationSingle(VisualisationClass):
                      color = "black", alpha = 0.8, linestyle = '--',
                      linewidth = self.linewidth)
             #a.set_xlabel(x_label, **self.label_properties)
-            a.set_ylabel(f"{self.score} - $\\varrho$", **self.label_properties)
+            a.set_ylabel(f"$\\varrho-${self.score}", **self.label_properties)
 
             #a.legend(prop=self.legend_properties, frameon=False)
             if log_y:
@@ -424,14 +424,28 @@ class VisualisationMany(VisualisationClass):
         fc_numerical = np.array(fc_numerical).squeeze()
         fc_emulators = np.array(fc_emulators).squeeze()
 
-        obs_mean = observations.mean(axis=0).transpose() 
-        obs_std = observations.std(axis=0).transpose()
-        num_mean = fc_numerical.mean(axis=0).transpose()
-        num_std = fc_numerical.std(axis=0).transpose()
-        em_ens_mean = fc_emulators.mean(axis=1).transpose() # model ens mean 
-        em_ens_std = 4.3*fc_emulators.std(axis=1).transpose()/np.sqrt(3) # model ensemble std for 3 models only
-        em_mean = em_ens_mean.mean(axis=1) # total mean
-        em_std = np.sqrt( (em_ens_std**2).sum(axis=1) / em_ens_std.shape[1]) # propagate uncertainty from ens_std.
+        obs_mean = np.nanquantile(observations, 0.5, axis=0, interpolation='linear')
+        num_mean = np.nanquantile(fc_numerical, 0.5, axis=0, interpolation='linear')
+        em_ens_mean = np.nanquantile(fc_emulators, 0.5, axis=1, interpolation='linear') # model ensemble std for 3 models only
+        em_mean = np.nanquantile(em_ens_mean, 0.5, axis=1, interpolation='linear') # total mean
+
+        obs_std_upper = np.nanquantile(observations, 0.975, axis=0, interpolation='linear')
+        obs_std_lower = np.nanquantile(observations, 0.025, axis=0, interpolation='linear')
+        num_std_upper = np.nanquantile(fc_numerical, 0.975, axis=0, interpolation='linear')
+        num_std_lower = np.nanquantile(fc_numerical, 0.025, axis=0, interpolation='linear')
+        em_ens_std_upper = np.nanquantile(fc_emulators, 0.975, axis=1, interpolation='linear')
+        em_ens_std_lower = np.nanquantile(fc_emulators, 0.025, axis=1, interpolation='linear')
+        em_std_upper = np.nanquantile(em_ens_mean, 0.975, axis=1, interpolation='linear')
+        em_std_lower = np.nanquantile(em_ens_mean, 0.025, axis=1, interpolation='linear')
+
+        #obs_mean = np.nanmean(observations, axis=0).transpose()
+        #obs_std = np.nanstd(observations, axis=0).transpose()
+        #num_mean = np.nanmean(fc_numerical, axis=0).transpose()
+        #num_std = np.nanstd(fc_numerical, axis=0).transpose()
+        #em_ens_mean = np.nanmean(fc_emulators, axis=1).transpose()
+        #em_ens_std = 4.3 * np.nanstd(fc_emulators, axis=1).transpose() / np.sqrt(3) # model ensemble std for 3 models only
+        #em_mean = np.nanmean(em_ens_mean, axis=1) # total mean
+        #em_std = np.sqrt((np.nan_to_num(em_ens_std**2).sum(axis=1)) / em_ens_std.shape[1]) # propagate uncertainty from ens_std.
 
         return (obs_mean, obs_std, num_mean, num_std, em_mean, em_std)
 
@@ -442,31 +456,43 @@ class VisualisationMany(VisualisationClass):
         scores_dispersion = []
         skill_scores = []
 
+        # Collect data for each station
         for station_name, station in self.stations_dict.items():
-
             scores_numerical.append(station[layer]['scores']['ECLand'])
             scores_emulators.append(station[layer]['scores']['Emulators'])
             scores_dispersion.append(station[layer]['scores_dispersion']['Emulators'])
             skill_scores.append(station[layer]['skill_scores']['Emulators'])
 
+        # Convert lists to arrays
         scores_numerical = np.array(scores_numerical)
         scores_emulators = np.array(scores_emulators)
         scores_dispersion = np.array(scores_dispersion)
         skill_scores = np.array(skill_scores)
 
-        skill_scores_mean = np.quantile(skill_scores, 0.5, axis=0)
-        scores_mean_emulators = np.quantile(scores_emulators, 0.5, axis=0)
-        scores_mean_numerical = np.quantile(scores_numerical, 0.5, axis=0)
+        # Check for NaNs in the input data
+        if np.isnan(scores_numerical).any() or np.isnan(scores_emulators).any() or np.isnan(skill_scores).any():
+            print("Warning: NaNs found in the input data.")
 
-        skill_scores_upper = np.quantile(skill_scores, 0.975, axis=0)
-        skill_scores_lower = np.quantile(skill_scores, 0.025, axis=0)
-        scores_numerical_upper = np.quantile(scores_numerical, 0.975, axis=0)
-        scores_numerical_lower = np.quantile(scores_numerical, 0.025, axis=0)
-        scores_emulators_upper = np.quantile(scores_emulators, 0.975, axis=0)
-        scores_emulators_lower = np.quantile(scores_emulators, 0.025, axis=0)
+        # Sort arrays for consistency in results
+        skill_scores = np.sort(skill_scores, axis=0)
+        scores_emulators = np.sort(scores_emulators, axis=0)
+        scores_numerical = np.sort(scores_numerical, axis=0)
 
-        #scores_upper_preds = scores_emulators_upper + 2*scores_dispersion.mean(axis=0)
-        #scores_lower_preds = scores_emulators_lower - 2*scores_dispersion.mean(axis=0)
+        # Use np.nanquantile to ignore NaNs in quantile computations
+        skill_scores_mean = np.nanquantile(skill_scores, 0.5, axis=0, interpolation='linear')
+        scores_mean_emulators = np.nanquantile(scores_emulators, 0.5, axis=0, interpolation='linear')
+        scores_mean_numerical = np.nanquantile(scores_numerical, 0.5, axis=0, interpolation='linear')
+
+        skill_scores_upper = np.nanquantile(skill_scores, 0.975, axis=0, interpolation='linear')
+        skill_scores_lower = np.nanquantile(skill_scores, 0.025, axis=0, interpolation='linear')
+        scores_numerical_upper = np.nanquantile(scores_numerical, 0.975, axis=0, interpolation='linear')
+        scores_numerical_lower = np.nanquantile(scores_numerical, 0.025, axis=0, interpolation='linear')
+        scores_emulators_upper = np.nanquantile(scores_emulators, 0.975, axis=0, interpolation='linear')
+        scores_emulators_lower = np.nanquantile(scores_emulators, 0.025, axis=0, interpolation='linear')
+
+        # Uncomment if using dispersion for further calculations
+        # scores_upper_preds = scores_emulators_upper + 2 * np.nanmean(scores_dispersion, axis=0)
+        # scores_lower_preds = scores_emulators_lower - 2 * np.nanmean(scores_dispersion, axis=0)
 
         return (scores_mean_numerical, scores_numerical_upper, scores_numerical_lower,
             scores_mean_emulators, scores_emulators_upper, scores_emulators_lower,
@@ -489,6 +515,13 @@ class VisualisationMany(VisualisationClass):
         self.fc_l1 = dict(zip(fcs, self.layer_forecast('layer0')))
         self.fc_l2 = dict(zip(fcs, self.layer_forecast('layer1')))
         self.fc_l3 = dict(zip(fcs, self.layer_forecast('layer2')))
+
+    def layer_horizons(self, threshold):    
+        
+        h_skill_mean = np.argmax( (1 - self.scores_l1["skill_scores_mean"]) < 0)
+        h_numerical_mean = np.argmax( (threshold - self.scores_l1["scores_mean_numerical"]) < 0)
+        h_emulator_mean = np.argmax( (threshold - self.scores_l1["scores_mean_emulators"]) < 0)
+        
     
     def plot_forecasts(self):
 
@@ -704,7 +737,7 @@ class VisualisationMany(VisualisationClass):
             a.hlines(0, xmin = min(doy_vector), xmax=max(doy_vector), 
                      color = "black", alpha = 0.8, linestyle = '--',
                      linewidth = self.linewidth)
-            a.set_ylabel(f"{self.score} - $\\varrho$", **self.label_properties)
+            a.set_ylabel(f"$\\varrho-${self.score}", **self.label_properties)
             tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)
             a.set_xticklabels([pd.Timestamp(t).strftime('%Y-%m-%d') for t in tick_positions], rotation=25)
@@ -758,7 +791,7 @@ class VisualisationMany(VisualisationClass):
             a.hlines(0, xmin = min(doy_vector), xmax=max(doy_vector), 
                      color = "black", alpha = 0.8, linestyle = '--',
                      linewidth = self.linewidth)
-            a.set_ylabel(f"{self.score} - SS", **self.label_properties)
+            a.set_ylabel(f"{self.score}-SS", **self.label_properties)
             a.set_ylim(-1,1)
             tick_positions = doy_vector[::step]  # Adjust frequency as needed
             a.set_xticks(tick_positions)

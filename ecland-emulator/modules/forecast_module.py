@@ -10,7 +10,7 @@ import torch
 
 from torch import tensor
 from misc.models import *
-from data_module import *
+from modules.data_module import *
 from abc import ABC, abstractmethod
 from tests.test_model import *
 

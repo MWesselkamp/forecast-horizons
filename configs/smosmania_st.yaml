@@ -33,4 +33,4 @@ maximum_leadtime: 56 # medium range: 14 days
 ensemble_size: 50
 
 score: "MAE"
-tolerance: 1.5 # Kelvin, for soil temperature.
+tolerance: 1.5 #0.1 #1.5 # Kelvin, for soil temperature.

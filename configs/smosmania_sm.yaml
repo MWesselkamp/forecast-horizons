@@ -16,11 +16,11 @@ targets_prog:
   - snowc
 
 
-path_to_plots:  '../plots/'
-path_to_results: '../results/'
+path_to_plots:  'ecland-emulator/plots/'
+path_to_results: 'ecland-emulator/results/'
 
 network: 'soil_SMOSMANIA_ISMN_2022.nc' #'soil_TERENO_ISMN_2022.nc' # #'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
-station: 'Condom' #'Gevenich'  #'Condom' ## 'Lahas' # CabrieresdAvignon, 'Narbonne' 'CreondArmagnac', 'LaGrandCombe', 'LezignanCorbieres', 'Mazan-Abbaye', 'Mejannes-le-Clap'...
+station: 'LaGrandCombe' #'Gevenich'  #'Condom' ## 'Lahas' # CabrieresdAvignon, 'Narbonne' 'CreondArmagnac', 'LaGrandCombe', 'LezignanCorbieres', 'Mazan-Abbaye', 'Mejannes-le-Clap'...
 variable: 'sm'
 depth: [0.05, 0.2, 0.3]
 
@@ -28,9 +28,9 @@ years: [2021, 2022]
 models: ['mlp', 'lstm', "xgb"] # , 'xgb'
 
 initial_time: '2022-02-01T00:00:00'
-maximum_leadtime: 40 # medium range 
+maximum_leadtime: 112 #56 # medium range: 14 days 
 
 ensemble_size: 50
 
 score: "MAE"
-tolerance: 0.1 # %, for soil moisture.
+tolerance: 0.1 #1.5 # Kelvin, for soil temperature.

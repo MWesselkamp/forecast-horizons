@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser(description="Load different config files for tr
 parser.add_argument('--station', type=nullable_string, help='Station name.')
 parser.add_argument('--variable', type=nullable_string, help='Specify variable from st or sm.')
 parser.add_argument('--maximum_leadtime', type=int, nargs='?', const=56, help='Specify maximum lead time (6-hourly). Default: two weeks')
-parser.add_argument('--make_plots', type=bool, nargs='?', const=False, help='Specify maximum lead time (6-hourly).')
+parser.add_argument('--make_plots', type=bool, nargs='?', const=False, help='Do you want to save the plots when evaluating.')
 parser.add_argument('--initial_time', type=nullable_string, nargs='?', const='2022-02-01T00:00:00',  help='Specify variable from st or sm.')
 args = parser.parse_args()
 
@@ -44,7 +44,7 @@ STATION = args.station
 VARIABLE = args.variable
 MAXIMUM_LEADTIME = args.maximum_leadtime
 MAKE_PLOTS = args.make_plots
-INITIAL_TIME = args.initial_time
+
 
 PATH_TO_PLOTS = 'ecland-emulator/plots'
 PATH_TO_RESULTS = 'ecland-emulator/results'
@@ -52,16 +52,18 @@ PATH_TO_RESULTS = 'ecland-emulator/results'
 if STATION == "Gevenich":
     EX_CONFIG = load_config(config_path = 'configs/tereno_st.yaml')
 else:
-    EX_CONFIG = load_config(config_path = 'configs/smosmania_st.yaml')
+    EX_CONFIG = load_config(config_path = f"configs/smosmania_{VARIABLE}.yaml")
 
-print("Network: ", EX_CONFIG['network'])
+INITIAL_TIME = EX_CONFIG['initial_time']
+
 print("Station: ", STATION)
-print("Variable: ", EX_CONFIG['variable'] )
+print("Variable: ", VARIABLE)
+print("Did you adjust the evaluation targets in the configuration script?")
+print("Initial time: ", INITIAL_TIME)
+print("Maximum Leadtime: ", MAXIMUM_LEADTIME)
+
 print("Depth: ", EX_CONFIG['depth'])
 print("Years: ", EX_CONFIG['years'])
-print("Models: ", EX_CONFIG['models'])
-print("Initial time: ", EX_CONFIG['initial_time'])
-
 
 def evaluate_ensemble(observations, 
                 fc_numerical, 
@@ -107,34 +109,6 @@ def evaluate_ensemble(observations,
         return layers, forecasts
 
 
-def ensemble_horizon(stations_dict, maximum_leadtime, doy_vector):
-
-    PlotStations = VisualisationMany(
-                 network = EX_CONFIG["network"], 
-                 station = "all", 
-                 variable = EX_CONFIG["variable"], 
-                 maximum_leadtime = maximum_leadtime, 
-                 score = EX_CONFIG["score"],
-                 doy_vector = doy_vector,
-                 evaluation = "ens", 
-                 path_to_plots = PATH_TO_PLOTS
-    )
-
-    PlotStations.assemble_scores(stations_dict)
-
-    layers = {}
-
-    for layer, scores in enumerate([PlotStations.scores_l1, PlotStations.scores_l2, PlotStations.scores_l3]):
-
-        layers[f"layer{layer}"] = {}
-
-        layers[f"layer{layer}"]["h_upper"] = np.argmax((1 - scores["skill_scores_upper"]) < 0)
-        layers[f"layer{layer}"]["h_mean"] = np.argmax((1 - scores["skill_scores_mean"]) < 0)
-        layers[f"layer{layer}"]["h_lower"] = np.argmax((1 - scores["skill_scores_lower"]) < 0)
-
-    return layers
-
-
 def evaluate_point(observations, 
                 fc_numerical, 
                 fc_emulators,
@@ -169,6 +143,19 @@ def evaluate_point(observations,
 
         return layers
 
+def ensemble_horizons(stations_dict):
+
+    layers = {}
+
+    for layer, scores in stations_dict.items():
+
+        layers[f"layer{layer}"] = {}
+
+        layers[f"layer{layer}"]["h_ecland"] = np.argmax((EX_CONFIG['tolerance'] - scores["scores"]["ECLand"]) < 0)
+        layers[f"layer{layer}"]["h_emulator"] = np.argmax((EX_CONFIG['tolerance'] - scores["scores"]["Emulators"]) < 0)
+        layers[f"layer{layer}"]["h_skillscore"] = np.argmax((1 - scores["skill_scores"]["Emulators"]) < 0)
+
+    return layers
 
 if __name__ == "__main__":
 
@@ -181,7 +168,8 @@ if __name__ == "__main__":
     Station.load_station(years = EX_CONFIG['years']) # Load two years of station data for lookback slicing
     Station.load_forcing() # Load forcing for matching data base with station data
     closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
-    Station.process_station_data() # specify path_to_plots, if you want to visualise
+    soil_type = Station.station_physiography()
+    Station.process_station_data(PATH_TO_PLOTS) # specify path_to_plots, if you want to visualise
 
     dynamic_features_dict = {}
     dynamic_features_prediction_dict = {}
@@ -241,10 +229,6 @@ if __name__ == "__main__":
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
                     maximum_leadtime= MAXIMUM_LEADTIME)
-
-    layers_horizons = ensemble_horizon(stations_dict = layers_ensemble, 
-                                       maximum_leadtime = MAXIMUM_LEADTIME, 
-                                       doy_vector = Station.doy_vector)
     
     save_to =os.path.join(PATH_TO_RESULTS, 
                           f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_ensemble.yaml")
@@ -260,13 +244,6 @@ if __name__ == "__main__":
     with open(save_to, 'w') as f:
         yaml.dump(forecast_ensemble, f, indent=4)
 
-    save_to =os.path.join(PATH_TO_RESULTS, 
-                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_ensemble_horizons.yaml")
-    print("Write forecasts to path:", save_to)
-
-    with open(save_to, 'w') as f:
-        yaml.dump(layers_horizons, f, indent=4)
-
     layers_point = evaluate_point(observations=station_data,
                     fc_numerical=fc_numerical,
                     fc_emulators=fc_emulators,
@@ -279,6 +256,16 @@ if __name__ == "__main__":
 
     with open(save_to, 'w') as f:
         yaml.dump(layers_point, f, indent=4)
+
+    layer_horizons = ensemble_horizons(layers_ensemble)
+    
+    save_to =os.path.join(PATH_TO_RESULTS, 
+                          f"{EX_CONFIG['network'].split('_')[1]}_{STATION}_{max(EX_CONFIG['years'])}_{VARIABLE}_horizons.yaml")
+    print("Write horizon layers to path:", save_to)
+    print("Horizon layers:", layer_horizons)
+
+    with open(save_to, 'w') as f:
+        yaml.dump(layer_horizons, f, indent=4)
 
     if MAKE_PLOTS:
         print("Making plots!")
@@ -309,8 +296,8 @@ if __name__ == "__main__":
         EnsemblePlots.plot_skill_scores(layers_ensemble['layer0']['skill_scores'], layers_ensemble['layer1']['skill_scores'], layers_ensemble['layer2']['skill_scores'], 
                                         log_y=False, sharey = False, invert=True)
         EnsemblePlots.plot_horizons(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'],
-                                    scores_l1_std = layers_ensemble['layer0']['scores_dispersion'], 
-                                    scores_l2_std = layers_ensemble['layer1']['scores_dispersion'], 
-                                    scores_l3_std = layers_ensemble['layer2']['scores_dispersion'],
+                                    #scores_l1_std = layers_ensemble['layer0']['scores_dispersion'], 
+                                    #scores_l2_std = layers_ensemble['layer1']['scores_dispersion'], 
+                                    #scores_l3_std = layers_ensemble['layer2']['scores_dispersion'],
                                     threshold = EX_CONFIG['tolerance'], hod=None, log_y=False)
 

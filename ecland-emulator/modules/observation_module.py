@@ -94,6 +94,13 @@ class ObservationModule:
 
         return closest_indices[0]
     
+    def station_physiography(self):
+        print(self.closest_gridcell['variable'])
+        print(self.closest_gridcell['data'])
+        #clim_sotype = self.closest_gridcell['data'].sel(variable='clim_sotype')
+        #print("Soil type from Climate field:", clim_sotype)
+        #return clim_sotype
+    
     def _process_temperature(self):
         print("Converting celsius into kelvin")
         return self.variable_data + 273.15
@@ -139,7 +146,7 @@ class ObservationModule:
     def _plot_station_data(self, save_to):
 
         self.variable_data.plot()
-        plt.savefig(os.path.join(save_to, f'{self.network_name}_image_plot.pdf'))
+        plt.savefig(os.path.join(save_to, f'{self.network_name}_{self.station}_image_plot.pdf'))
         plt.show()
 
     def match_indices(self, dataset, target_variables):

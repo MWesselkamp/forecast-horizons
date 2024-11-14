@@ -24,60 +24,78 @@ SCRIPT_DIR = os.getcwd()
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR) 
 
+def nullable_string(val):
+    return None if not val else val
+
 parser = argparse.ArgumentParser(description="Load different config files for training.")
 parser.add_argument('--maximum_leadtime', type=int, nargs='?', const=56, help='Specify maximum lead time (6-hourly). Default: two weeks')
+parser.add_argument('--variable', type=nullable_string, help='Specify variable from st or sm.')
 args = parser.parse_args()
 
 MAXIMUM_LEADTIME = args.maximum_leadtime
+VARIABLE = args.variable
 PATH_TO_PLOTS = 'ecland-emulator/plots/'
+PATH_TO_RESULTS = 'ecland-emulator/results'
 EX_STATION = "Condom"
-EX_CONFIG = load_config(config_path = 'configs/smosmania_st.yaml')
 
-Station = ObservationModule(network = EX_CONFIG['network'], 
-                                station = EX_STATION ,
-                                variable = EX_CONFIG['variable'],
-                                depth=EX_CONFIG['depth']) # Initialise the Observation Module with the default Station (Gevenich)
-    
+EX_CONFIG = load_config(config_path = f"configs/smosmania_{VARIABLE}.yaml")
 
-Station.load_station(years = EX_CONFIG['years']) # Load two years of station data for lookback slicing
-Station.load_forcing() # Load forcing for matching data base with station data
-closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
-Station.process_station_data() # specify path_to_plots, if you want to visualise
-station_data = Station.slice_station_data(lookback=0,t_0=EX_CONFIG['initial_time'])
+print("MAXIMUM LEADTIME:", MAXIMUM_LEADTIME)
 
-DOY_VECTOR = Station.doy_vector
 
-use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
-                'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
-                'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais']
+if __name__ == "__main__":
 
-stations_dict = {}
-for station in use_stations:
-    with open(f"ecland-emulator/results/SMOSMANIA_{station}_2022_st_ensemble.yaml", 'r') as f:
-        layers = yaml.load(f, Loader=yaml.UnsafeLoader)
-    stations_dict[station] = layers
+    Station = ObservationModule(network = EX_CONFIG['network'], 
+                                    station = EX_STATION ,
+                                    variable = VARIABLE,
+                                    depth=EX_CONFIG['depth']) # Initialise the Observation Module with the default Station (Gevenich)
+        
 
-forecast_dict = {}
-for station in use_stations[:7]:
-    with open(f"ecland-emulator/results/SMOSMANIA_{station}_2022_st_ensemble_fc.yaml", 'r') as f:
-        layers_fc = yaml.load(f, Loader=yaml.UnsafeLoader)
-    forecast_dict[station] = layers_fc
+    Station.load_station(years = EX_CONFIG['years']) # Load two years of station data for lookback slicing
+    Station.load_forcing() # Load forcing for matching data base with station data
+    closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
+    Station.process_station_data() # specify path_to_plots, if you want to visualise
+    station_data = Station.slice_station_data(lookback=0,t_0=EX_CONFIG['initial_time'])
 
-PlotStations = VisualisationMany(
-                 network = EX_CONFIG["network"], 
-                 station = "all", 
-                 variable = EX_CONFIG["variable"], 
-                 maximum_leadtime = MAXIMUM_LEADTIME, 
-                 score = EX_CONFIG["score"],
-                 doy_vector = DOY_VECTOR,
-                 evaluation = "ens", 
-                 path_to_plots = PATH_TO_PLOTS
-)
+    DOY_VECTOR = Station.doy_vector
 
-PlotStations.assemble_scores(stations_dict)
-PlotStations.plot_scores()
-PlotStations.plot_horizons(EX_CONFIG["tolerance"])
-PlotStations.plot_skill_scores()
+    #use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
+    #                'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
+    #                'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais']
 
-PlotStations.assemble_forecasts(forecast_dict)
-PlotStations.plot_forecasts()
+    #use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'SaintFelixdeLauragais','PeyrusseGrande',
+    #                'Mouthoumet', 'Mejannes-le-Clap', 'CreondArmagnac']
+
+    use_stations = ['Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
+                    'LaGrandCombe', 'CreondArmagnac', 'Urgons', 'Condom']
+
+    stations_dict = {}
+    for station in use_stations:
+        with open(f"ecland-emulator/results/SMOSMANIA_{station}_2022_{VARIABLE}_ensemble.yaml", 'r') as f:
+            layers = yaml.load(f, Loader=yaml.UnsafeLoader)
+        stations_dict[station] = layers
+
+    forecast_dict = {}
+    for station in use_stations[:7]:
+        with open(f"ecland-emulator/results/SMOSMANIA_{station}_2022_{VARIABLE}_ensemble_fc.yaml", 'r') as f:
+            layers_fc = yaml.load(f, Loader=yaml.UnsafeLoader)
+        forecast_dict[station] = layers_fc
+
+    PlotStations = VisualisationMany(
+                    network = EX_CONFIG["network"], 
+                    station = "all", 
+                    variable = VARIABLE, 
+                    maximum_leadtime = MAXIMUM_LEADTIME, 
+                    score = EX_CONFIG["score"],
+                    doy_vector = DOY_VECTOR,
+                    evaluation = "ens", 
+                    path_to_plots = PATH_TO_PLOTS
+    )
+
+    PlotStations.assemble_scores(stations_dict)
+    PlotStations.plot_scores()
+    PlotStations.plot_horizons(EX_CONFIG["tolerance"])
+    PlotStations.plot_skill_scores()
+
+    PlotStations.assemble_forecasts(forecast_dict)
+    PlotStations.plot_forecasts()
