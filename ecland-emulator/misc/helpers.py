@@ -59,3 +59,29 @@ def load_hpars(use_model):
         hpars = yaml.safe_load(stream)
     print(hpars)
     return hpars
+
+
+def print_nested_dict_structure(d, indent=0):
+    """
+    Recursively prints the structure of a nested dictionary.
+
+    Parameters:
+    - d (dict): The dictionary to analyze.
+    - indent (int): Current indentation level for pretty-printing.
+    """
+    for key, value in d.items():
+        print(" " * indent + f"{key}: ", end="")
+        if isinstance(value, dict):
+            print("{")
+            print_nested_dict_structure(value, indent + 2)
+            print(" " * indent + "}")
+        elif isinstance(value, list):
+            print(f"List[{len(value)}]")
+        elif isinstance(value, tuple):
+            print(f"Tuple[{len(value)}]")
+        elif isinstance(value, (int, float, str, bool)):
+            print(type(value).__name__)
+        elif value is None:
+            print("None")
+        else:
+            print(type(value).__name__)

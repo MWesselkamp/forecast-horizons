@@ -50,10 +50,28 @@ class EvaluationBasic:
         self.fc_numerical = fc_numerical
         self.fc_emulator = fc_emulator
 
-    @abstractmethod
+    def transform(self, Transform):
+
+        self.Transform = Transform
+        self.Transform.compute_global_min_max(self.observations, 
+                                         self.fc_numerical,
+                                         self.fc_emulator)
+
+        self.observations = self.Transform.normalise(self.observations)
+        self.fc_numerical = self.Transform.normalise(self.fc_numerical)
+        self.fc_emulator = self.Transform.normalise(self.fc_emulator)
+
     def subset_samples(self):
         
-        pass
+        self.observations = self.observations[:self.maximum_evaluation_time, :, self.layer_index]
+        self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, :, self.variable_indices[self.layer_index]]
+        self.fc_emulator = self.fc_emulator[:self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]] 
+        
+        print("Shape of subset fc_emulator: ", self.fc_emulator.shape)
+        print("Shape of subset observations: ", self.observations.shape)
+        print("Shape of subset fc_numerical: ", self.fc_numerical.shape)
+
+        return [self.observations,self.fc_numerical, self.fc_emulator]
 
     def _to_tensor(self, x):
 
@@ -82,21 +100,16 @@ class EvaluationBasic:
         model_score = self.evaluate_emulator()
         return model_score[1:] - model_score[:-1]
 
-    @abstractmethod
     def get_skill_score(self):
 
-        pass
+        model_score, _ = self.evaluate_emulator()
+        reference_score = self.evaluate_numerical()
+        skill_score = 1 - model_score/reference_score
+        return skill_score
     
 
 class PointEvaluation(EvaluationBasic):
 
-    def subset_samples(self):
-        
-        self.observations = self.observations[:self.maximum_evaluation_time, :, self.layer_index]
-        self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, :, self.variable_indices[self.layer_index]]
-        self.fc_emulator = self.fc_emulator[:self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]]
-
-        print("Shape of subset: ", self.fc_emulator.shape)
 
     def rmse(self, x_preds, x_ref, **kwargs):
 
@@ -129,23 +142,31 @@ class PointEvaluation(EvaluationBasic):
         eval_array = np.array([self.score(self.observations[t, :, np.newaxis], 
                                           self.fc_emulator[t, :, np.newaxis]) for t in range(self.maximum_evaluation_time)])
         
-        return eval_array
+        return eval_array, None
 
-    def get_skill_score(self):
-
-        model_score = self.evaluate_emulator()
-        reference_score = self.evaluate_numerical()
-        return model_score/reference_score
 
 class EnsembleEvaluation(EvaluationBasic):
+
+    def set_samples(self, observations, fc_numerical, fc_emulator):
+
+        self.observations = observations
+        self.fc_numerical = fc_numerical
+
+        min_length = min(emulator.shape[0] for emulator in fc_emulator.values())
+        truncated_fc_emulator = {
+            key: emulator[:min_length] for key, emulator in fc_emulator.items()
+            }
+        stacked_fc_emulator = np.stack(list(truncated_fc_emulator.values()), axis=0)
+        self.fc_emulator = stacked_fc_emulator
+
+        print("STACKED EMUATOR SHAPE: ", self.fc_emulator.shape)
 
     def subset_samples(self):
         
         self.observations = self.observations[:self.maximum_evaluation_time, :, self.layer_index]
         self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, :, self.variable_indices[self.layer_index]]
-        self.fc_emulator = np.stack(
-            [emulator[:self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]] for key, emulator in self.fc_emulator.items()]
-        )
+        self.fc_emulator = self.fc_emulator[:, :self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]] 
+        
         print("Shape of subset fc_emulator: ", self.fc_emulator.shape)
         print("Shape of subset observations: ", self.observations.shape)
         print("Shape of subset fc_numerical: ", self.fc_numerical.shape)
@@ -224,89 +245,5 @@ class EnsembleEvaluation(EvaluationBasic):
 
         return eval_array_mean, eval_array_std
     
-    def get_skill_score(self):
 
-        model_score, _ = self.evaluate_emulator()
-        reference_score = self.evaluate_numerical()
-        return model_score/reference_score
     
-
-class EvaluationModule:
-
-    def __init__(self,
-                 observations, 
-                 fc_numerical, 
-                 fc_emulators,
-                 evaluator):
-
-        self.observations = observations
-        self.fc_numerical = fc_numerical
-        self.fc_emulators = fc_emulators
-        self.evaluator = evaluator
-
-    def initialise_evaluator(self,
-                             score,
-                             layer_index,
-                             variable_indices,
-                             maximum_evaluation_time):
-        
-        self.score = score
-        self.variable_indices = variable_indices
-        self.maximum_evaluation_time = maximum_evaluation_time
-        
-        if self.evaluator == "ensemble":
-            self.EvaluateModel = EnsembleEvaluation(score =  score,
-                                        layer_index = layer_index,
-                                        variable_indices = variable_indices,
-                                        maximum_evaluation_time = maximum_evaluation_time)
-        elif self.evaluator == "point":
-            self.EvaluateModel = PointEvaluation(score =  score,
-                                    layer_index = layer_index,
-                                    variable_indices = variable_indices,
-                                    maximum_evaluation_time = maximum_evaluation_time)
-        else:
-            print("Don't know evaluator")
-
-    def evaluate(self):
-
-        self.EvaluateModel.set_samples(observations=self.observations ,
-                                fc_numerical=self.fc_numerical,
-                                fc_emulator=self.fc_emulators)
-        self.EvaluateModel.subset_samples()
-        
-        numerical_score = self.EvaluateModel.evaluate_stepwise(model = "numerical")
-        emulator_score = self.EvaluateModel.evaluate_stepwise(model = "emulator")
-        skill = self.EvaluateModel.get_skill_score()
-
-        return numerical_score, emulator_score, skill
-
-    def _scores_container(self):
-        scores = {}
-        skill_scores = {}
-        return scores, skill_scores
-
-    def _layers_container(self):
-        self.layers = {}
-
-    def run_ensemble_evaluation(self):
-
-        self._layers_container()
-        for layer in [0,1,2]:
-            scores, skill_scores = self._scores_container()
-            self.EvaluateModel = EnsembleEvaluation(score = self.score,
-                                        layer_index = layer,
-                                        variable_indices = self.variable_indices,
-                                        maximum_evaluation_time = self.maximum_evaluation_time)
-            numerical_score, emulator_score, skill = self.evaluate()
-            
-    def run_point_evaluation(self):
-
-        self._layers_container()
-        for layer in [0,1,2]:
-            scores, skill_scores = self._scores_container()
-            self.EvaluateModel = PointEvaluation(score = self.score,
-                                        layer_index = layer,
-                                        variable_indices = self.variable_indices,
-                                        maximum_evaluation_time = self.maximum_evaluation_time)
-            for mod, fc_emulator in self.fc_emulators.items():
-                numerical_score, emulator_score, skill = self.evaluate()

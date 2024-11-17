@@ -490,3 +490,127 @@ class EcDatasetXGB(EcDataset):
 
         return X_static, X[:-1], Y_prog[:-1], Y_prog_initial_states
     
+
+class Transform:
+    def __init__(self, use_min_max=True):
+        """
+        Initializes the Transform object and sets the normalization functions.
+
+        Parameters:
+        - data_array (numpy.ndarray): The data to be transformed.
+        - indices (list or None): Indices of columns/rows to apply the transformation to. If None, apply to all.
+        - use_min_max (bool): If True, use min-max normalization. Otherwise, use the identity transform.
+        """
+        
+        self.transform = {'min': None, 'max': None} if use_min_max else {}
+
+        # Set the methods based on the flag
+        if use_min_max:
+            self.normalise = self._min_max_normalise
+            self.inv_normalise = self._min_max_inv_normalise
+        else:
+            self.normalise = self._identity_transform
+            self.inv_normalise = self._identity_transform
+
+    def _to_tensor(self, data):
+        """
+        Ensures the input data is converted to a PyTorch tensor.
+
+        Parameters:
+        - data: Input data, either a NumPy array or a PyTorch tensor.
+
+        Returns:
+        - PyTorch tensor.
+        """
+        if not isinstance(data, torch.Tensor):
+            return torch.tensor(data, dtype=torch.float32)
+        return data
+    
+    def compute_global_min_max(self, *inputs):
+        """
+        Compute global min and max across multiple inputs.
+
+        Parameters:
+        - inputs: Variable number of inputs (numpy arrays or PyTorch tensors).
+
+        Sets:
+        - self.transform['min']: Global minimum across all inputs.
+        - self.transform['max']: Global maximum across all inputs.
+        """
+        all_data = [self._to_tensor(data).flatten() for data in inputs]
+        concatenated = torch.cat(all_data)
+        self.transform['min'] = self._safe_min(concatenated)
+        self.transform['max'] = self._safe_max(concatenated)
+
+    def _safe_min(self, data):
+        mask = ~torch.isnan(data)
+        return torch.min(data[mask])
+    
+    def _safe_max(self, data):
+        mask = ~torch.isnan(data)
+        return torch.max(data[mask])
+
+    def _safe_min_old(self, data, dim=None, keepdim=False):
+        mask = ~torch.isnan(data)
+        masked_data = data.clone()
+        masked_data[~mask] = float('inf')  # Set NaNs to +inf so they are ignored
+        min_values, _ = torch.min(masked_data, dim=dim, keepdim=keepdim)
+        return min_values
+    
+    def _safe_max_old(self, data, dim=None, keepdim=False):
+        mask = ~torch.isnan(data)
+        masked_data = data.clone()
+        masked_data[~mask] = float('-inf')  # Set NaNs to -inf so they are ignored
+        max_values, _ = torch.max(masked_data, dim=dim, keepdim=keepdim)
+        return max_values
+    
+    def _min_max_normalise(self, data_array):
+        """
+        Normalizes the data_array using min-max normalization.
+
+        Returns:
+        - Normalized data.
+        """
+
+        data_array = self._to_tensor(data_array)
+
+        self.transform['min'] = self._safe_min(data_array) # , dim=0, keepdim=True
+        self.transform['max'] = self._safe_max(data_array) # , dim=0, keepdim=True
+
+        normalized = (data_array - self.transform['min']) / (self.transform['max'] - self.transform['min'] + 1e-8)
+
+        normalized[torch.isnan(data_array)] = float('nan')  # Retain NaNs
+        return normalized 
+
+    def _min_max_inv_normalise(self, normalized_data):
+        """
+        Applies the inverse of the min-max normalization to the data.
+
+        Parameters:
+        - normalized_data (numpy.ndarray): The normalized data to inverse-transform.
+
+        Returns:
+        - Original data array before normalization.
+        """   
+
+        data_array = self._to_tensor(data_array)
+
+        if self.transform['min'] is None or self.transform['max'] is None:
+            raise ValueError("Transform parameters (min and max) are not set. Perform normalization first.")
+        
+        original = normalized_data * (self.transform['max'] - self.transform['min']) + self.transform['min']
+        original[torch.isnan(normalized_data)] = float('nan')
+        return original
+
+
+    def _identity_transform(self, data=None):
+        """
+        Identity transformation: Returns the data unchanged.
+
+        Parameters:
+        - data (numpy.ndarray or None): Data to return unchanged. If None, uses `data_array`.
+
+        Returns:
+        - Unchanged data.
+        """
+        return self._to_tensor(data)

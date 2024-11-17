@@ -28,7 +28,7 @@ years: [2021, 2022]
 models: ['mlp', 'lstm', "xgb"] # , 'xgb'
 
 initial_time: '2022-02-01T00:00:00'
-maximum_leadtime: 112 #56 # medium range: 14 days 
+maximum_leadtime: 224 #two months #56 # medium range: 14 days 
 
 ensemble_size: 50
 

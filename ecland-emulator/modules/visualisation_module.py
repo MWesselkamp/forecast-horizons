@@ -108,18 +108,18 @@ class VisualisationSingle(VisualisationClass):
                            dynamic_features_prediction_dict['xgb'][:self.maximum_leadtime,:,matching_indices[i]], 
                            color="pink", label="XGB", alpha = 0.9, linewidth = self.linewidth) 
                 
-        ax[0].plot(doy_vector, dynamic_features_dict['mlp'][:self.maximum_leadtime,:,matching_indices[0]], 
+        ax[0].plot(doy_vector, dynamic_features_dict[:self.maximum_leadtime,:,matching_indices[0]], 
                    color="cyan", label="ECLand", alpha = 0.7, linewidth = self.linewidth)
         ax[0].plot(doy_vector, station_data[:self.maximum_leadtime,:,0], 
                    color="green", label=self.station, alpha = 0.7, linewidth = self.linewidth)
         ax[0].legend(prop=self.legend_properties, frameon=True)
 
-        ax[1].plot(doy_vector, dynamic_features_dict['mlp'][:self.maximum_leadtime,:,matching_indices[1]], 
+        ax[1].plot(doy_vector, dynamic_features_dict[:self.maximum_leadtime,:,matching_indices[1]], 
                    color="cyan", label="ECLand", alpha = 0.7, linewidth = self.linewidth)
         ax[1].plot(doy_vector, station_data[:self.maximum_leadtime,:,1], 
                    color="green", label=self.station, alpha = 0.7, linewidth = self.linewidth)
         
-        ax[2].plot(doy_vector, dynamic_features_dict['mlp'][:self.maximum_leadtime,:,matching_indices[2]], 
+        ax[2].plot(doy_vector, dynamic_features_dict[:self.maximum_leadtime,:,matching_indices[2]], 
                    color="cyan", label="ECLand", alpha = 0.7, linewidth = self.linewidth)
         ax[2].plot(doy_vector, station_data[:self.maximum_leadtime,:,2], 
                    color="green", label=self.station, alpha = 0.7, linewidth = self.linewidth)
@@ -280,7 +280,7 @@ class VisualisationSingle(VisualisationClass):
         plt.savefig(fig_path)
         plt.show()
 
-    def plot_skill_scores(self, skill_scores_l1, skill_scores_l2, skill_scores_l3, hod = None, log_y = True, sharey = True, invert = False):
+    def plot_skill_scores(self, skill_scores_l1, skill_scores_l2, skill_scores_l3, hod = None, log_y = True, sharey = True):
 
         if hod is None:
             doy_vector = self.doy_vector[:self.maximum_leadtime]
@@ -297,8 +297,6 @@ class VisualisationSingle(VisualisationClass):
         ax[0].axhspan(0, 1, facecolor='lightgray', alpha=0.5)  
         i = 0
         for model, scores in skill_scores_l1.items():
-            if invert:
-                scores = 1-scores
             ax[0].plot(doy_vector, scores, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
             i += 1
         #ax[0].set_ylabel(f"{score}-SS", **self.label_properties)
@@ -307,16 +305,12 @@ class VisualisationSingle(VisualisationClass):
         ax[1].axhspan(0, 1, facecolor='lightgray', alpha=0.5) 
         i = 0
         for model, scores in skill_scores_l2.items():
-            if invert:
-                scores = 1-scores
             ax[1].plot(doy_vector, scores, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
             i += 1
 
         ax[2].axhspan(0, 1, facecolor='lightgray', alpha=0.5) 
         i = 0
         for model, scores in skill_scores_l3.items():
-            if invert:
-                scores = 1-scores
             ax[2].plot(doy_vector, scores, color = colors[i], alpha = 0.8, label = model, linewidth = self.linewidth)
             i += 1
         ax[2].set_xlabel(x_label, **self.label_properties)
@@ -427,7 +421,12 @@ class VisualisationMany(VisualisationClass):
         obs_mean = np.nanquantile(observations, 0.5, axis=0, interpolation='linear')
         num_mean = np.nanquantile(fc_numerical, 0.5, axis=0, interpolation='linear')
         em_ens_mean = np.nanquantile(fc_emulators, 0.5, axis=1, interpolation='linear') # model ensemble std for 3 models only
-        em_mean = np.nanquantile(em_ens_mean, 0.5, axis=1, interpolation='linear') # total mean
+        em_mean = np.nanquantile(em_ens_mean, 0.5, axis=0, interpolation='linear') # total mean
+
+        print("Obs mean shape: ", obs_mean.shape)
+        print("Num mean shape: ", num_mean.shape)
+        print("em_ens_mean mean shape: ", em_ens_mean.shape)
+        print("em_mean mean shape: ", em_mean.shape)
 
         obs_std_upper = np.nanquantile(observations, 0.975, axis=0, interpolation='linear')
         obs_std_lower = np.nanquantile(observations, 0.025, axis=0, interpolation='linear')
@@ -435,8 +434,12 @@ class VisualisationMany(VisualisationClass):
         num_std_lower = np.nanquantile(fc_numerical, 0.025, axis=0, interpolation='linear')
         em_ens_std_upper = np.nanquantile(fc_emulators, 0.975, axis=1, interpolation='linear')
         em_ens_std_lower = np.nanquantile(fc_emulators, 0.025, axis=1, interpolation='linear')
-        em_std_upper = np.nanquantile(em_ens_mean, 0.975, axis=1, interpolation='linear')
-        em_std_lower = np.nanquantile(em_ens_mean, 0.025, axis=1, interpolation='linear')
+        em_std_upper = np.nanquantile(em_ens_mean, 0.975, axis=0, interpolation='linear')
+        em_std_lower = np.nanquantile(em_ens_mean, 0.025, axis=0, interpolation='linear')
+
+        print("obs_std_upper mean shape: ", obs_std_upper.shape)
+        print("em_ens_std_upper mean shape: ", em_ens_std_upper.shape)
+        print("em_std_upper mean shape: ", em_std_upper.shape)
 
         #obs_mean = np.nanmean(observations, axis=0).transpose()
         #obs_std = np.nanstd(observations, axis=0).transpose()
@@ -447,10 +450,11 @@ class VisualisationMany(VisualisationClass):
         #em_mean = np.nanmean(em_ens_mean, axis=1) # total mean
         #em_std = np.sqrt((np.nan_to_num(em_ens_std**2).sum(axis=1)) / em_ens_std.shape[1]) # propagate uncertainty from ens_std.
 
-        return (obs_mean, obs_std, num_mean, num_std, em_mean, em_std)
+        return (obs_mean, obs_std_upper, obs_std_lower, num_mean, num_std_upper, num_std_lower, 
+                em_mean, em_std_upper, em_std_lower)
+    
+    def _assemble_layers(self, layer, scores):
 
-    def layer_statistics(self, layer):
-        
         scores_numerical = []
         scores_emulators = []
         scores_dispersion = []
@@ -458,8 +462,8 @@ class VisualisationMany(VisualisationClass):
 
         # Collect data for each station
         for station_name, station in self.stations_dict.items():
-            scores_numerical.append(station[layer]['scores']['ECLand'])
-            scores_emulators.append(station[layer]['scores']['Emulators'])
+            scores_numerical.append(station[layer][scores]['ECLand'])
+            scores_emulators.append(station[layer][scores]['Emulators'])
             scores_dispersion.append(station[layer]['scores_dispersion']['Emulators'])
             skill_scores.append(station[layer]['skill_scores']['Emulators'])
 
@@ -468,6 +472,12 @@ class VisualisationMany(VisualisationClass):
         scores_emulators = np.array(scores_emulators)
         scores_dispersion = np.array(scores_dispersion)
         skill_scores = np.array(skill_scores)
+
+        return scores_numerical, scores_emulators, scores_dispersion, skill_scores
+
+    def layer_statistics(self, layer, scores):
+        
+        scores_numerical, scores_emulators, scores_dispersion, skill_scores = self._assemble_layers(layer, scores)
 
         # Check for NaNs in the input data
         if np.isnan(scores_numerical).any() or np.isnan(scores_emulators).any() or np.isnan(skill_scores).any():
@@ -498,27 +508,28 @@ class VisualisationMany(VisualisationClass):
             scores_mean_emulators, scores_emulators_upper, scores_emulators_lower,
             skill_scores_mean, skill_scores_upper, skill_scores_lower)
     
-    def assemble_scores(self, stations_dict):
+    def assemble_scores(self, stations_dict, scores = 'scores'):
 
         self.stations_dict = stations_dict
         statistics = ["scores_mean_numerical", "scores_numerical_upper", "scores_numerical_lower",
             "scores_mean_emulators", "scores_emulators_upper", "scores_emulators_lower",
             "skill_scores_mean", "skill_scores_upper", "skill_scores_lower"]
-        self.scores_l1 = dict(zip(statistics, self.layer_statistics('layer0')))
-        self.scores_l2 = dict(zip(statistics, self.layer_statistics('layer1')))
-        self.scores_l3 = dict(zip(statistics, self.layer_statistics('layer2')))
+        self.scores_l1 = dict(zip(statistics, self.layer_statistics('layer0', scores)))
+        self.scores_l2 = dict(zip(statistics, self.layer_statistics('layer1', scores)))
+        self.scores_l3 = dict(zip(statistics, self.layer_statistics('layer2', scores)))
 
     def assemble_forecasts(self, forecast_dict):
 
         self.forecast_dict = forecast_dict
-        fcs = ["obs_mean", "obs_std", "num_mean", "num_std", "em_mean", "em_std"]
+        fcs = ["obs_mean", "obs_std_upper", "obs_std_lower", "num_mean", "num_std_upper", "num_std_lower", 
+                "em_mean", "em_std_upper", "em_std_lower"]
         self.fc_l1 = dict(zip(fcs, self.layer_forecast('layer0')))
         self.fc_l2 = dict(zip(fcs, self.layer_forecast('layer1')))
         self.fc_l3 = dict(zip(fcs, self.layer_forecast('layer2')))
 
     def layer_horizons(self, threshold):    
         
-        h_skill_mean = np.argmax( (1 - self.scores_l1["skill_scores_mean"]) < 0)
+        h_skill_mean = np.argmax( (self.scores_l1["skill_scores_mean"]) < 0)
         h_numerical_mean = np.argmax( (threshold - self.scores_l1["scores_mean_numerical"]) < 0)
         h_emulator_mean = np.argmax( (threshold - self.scores_l1["scores_mean_emulators"]) < 0)
         
@@ -534,57 +545,40 @@ class VisualisationMany(VisualisationClass):
         ax[1].set_title("Subsurface Layer 1", **self.label_properties)
         ax[2].set_title("Subsurface Layer 2", **self.label_properties)
 
-        ax[0].fill_between(doy_vector, 
-                           self.fc_l1["obs_mean"] - 2*self.fc_l1["obs_std"],
-                           self.fc_l1["obs_mean"] + 2*self.fc_l1["obs_std"], 
+        ax[0].fill_between(doy_vector, self.fc_l1["obs_std_upper"], self.fc_l1["obs_std_lower"] , 
                            color = "green", alpha =0.3)
-        ax[0].fill_between(doy_vector, 
-                           self.fc_l1["num_mean"] - 2*self.fc_l1["num_std"],
-                           self.fc_l1["num_mean"] + 2*self.fc_l1["num_std"], 
+        ax[0].fill_between(doy_vector, self.fc_l1["num_std_upper"], self.fc_l1["num_std_lower"] , 
                            color = "cyan", alpha =0.3)
-        ax[0].fill_between(doy_vector, 
-                           self.fc_l1["em_mean"] - 2*self.fc_l1["em_std"],
-                           self.fc_l1["em_mean"] + 2*self.fc_l1["em_std"], 
+        ax[0].fill_between(doy_vector, self.fc_l1["em_std_upper"], self.fc_l1["em_std_lower"] ,  
                            color = "purple", alpha =0.3)
         ax[0].set_ylabel(f"{self.ylabel}", **self.label_properties)
         ax[0].plot(doy_vector, self.fc_l1["obs_mean"], color = "lime", label = "SMOSMANIA")
         ax[0].plot(doy_vector, self.fc_l1["num_mean"], color = "cyan", label = "ECLand")
         ax[0].plot(doy_vector, self.fc_l1["em_mean"], color = "magenta", label = "AILand")
 
-        ax[1].fill_between(doy_vector, 
-                           self.fc_l2["obs_mean"] - 2*self.fc_l2["obs_std"],
-                           self.fc_l2["obs_mean"] + 2*self.fc_l2["obs_std"], 
+        ax[1].fill_between(doy_vector, self.fc_l2["obs_std_upper"], self.fc_l2["obs_std_lower"] , 
                            color = "green", alpha =0.3)
-        ax[1].fill_between(doy_vector, 
-                           self.fc_l2["num_mean"] - 2*self.fc_l2["num_std"],
-                           self.fc_l2["num_mean"] + 2*self.fc_l2["num_std"], 
+        ax[1].fill_between(doy_vector, self.fc_l2["num_std_upper"], self.fc_l2["num_std_lower"] , 
                            color = "cyan", alpha =0.3)
-        ax[1].set_ylabel(f"{self.ylabel}", **self.label_properties)
-        ax[1].fill_between(doy_vector, 
-                           self.fc_l2["em_mean"] - 2*self.fc_l2["em_std"],
-                           self.fc_l2["em_mean"] + 2*self.fc_l2["em_std"], 
+        ax[1].fill_between(doy_vector, self.fc_l2["em_std_upper"], self.fc_l2["em_std_lower"] ,  
                            color = "purple", alpha =0.3)
+        ax[1].set_ylabel(f"{self.ylabel}", **self.label_properties)
+
         ax[1].plot(doy_vector, self.fc_l2["obs_mean"], color = "lime", label = "SMOSMANIA")
         ax[1].plot(doy_vector, self.fc_l2["num_mean"], color = "cyan", label = "ECLand")
         ax[1].plot(doy_vector, self.fc_l2["em_mean"], color = "magenta", label = "AILand")
 
-        ax[2].fill_between(doy_vector, 
-                       self.fc_l3["obs_mean"] - 2*self.fc_l3["obs_std"],
-                           self.fc_l3["obs_mean"] + 2*self.fc_l3["obs_std"], 
+        ax[2].fill_between(doy_vector, self.fc_l3["obs_std_upper"], self.fc_l3["obs_std_lower"] , 
                            color = "green", alpha =0.3)
-        ax[2].fill_between(doy_vector, 
-                           self.fc_l3["num_mean"] - 2*self.fc_l3["num_std"],
-                           self.fc_l3["num_mean"] + 2*self.fc_l3["num_std"], 
+        ax[2].fill_between(doy_vector, self.fc_l3["num_std_upper"], self.fc_l3["num_std_lower"] , 
                            color = "cyan", alpha =0.3)
-        ax[2].fill_between(doy_vector, 
-                           self.fc_l3["em_mean"] - 2*self.fc_l3["em_std"],
-                           self.fc_l3["em_mean"] + 2*self.fc_l3["em_std"], 
+        ax[2].fill_between(doy_vector, self.fc_l3["em_std_upper"], self.fc_l3["em_std_lower"] ,  
                            color = "purple", alpha =0.3)
         ax[2].plot(doy_vector, self.fc_l3["obs_mean"], color = "lime", label = "SMOSMANIA")
         ax[2].plot(doy_vector, self.fc_l3["num_mean"], color = "cyan", label = "ECLand")
         ax[2].plot(doy_vector, self.fc_l3["em_mean"], color = "magenta", label = "AILand")
         ax[2].set_ylabel(f"{self.ylabel}", **self.label_properties)
-        ax[2].legend(prop=self.legend_properties, frameon=True)
+        ax[2].legend(prop=self.legend_properties, frameon=True, loc="lower right")
         ax[2].set_xlabel(self.xlabel, **self.label_properties)
 
         for a in ax:
@@ -762,28 +756,28 @@ class VisualisationMany(VisualisationClass):
 
         ax[0].axhspan(0, 1, facecolor='lightgray', alpha=0.5)  
         ax[0].fill_between(doy_vector, 
-                           1- self.scores_l1["skill_scores_upper"], 
-                           1- self.scores_l1["skill_scores_lower"], 
+                           self.scores_l1["skill_scores_upper"], 
+                           self.scores_l1["skill_scores_lower"], 
                            alpha = 0.3,
                            color = "blue")
-        ax[0].plot(doy_vector, 1- self.scores_l1["skill_scores_mean"], color="darkblue", label="SMOSMANIA")
+        ax[0].plot(doy_vector, self.scores_l1["skill_scores_mean"], color="darkblue", label="SMOSMANIA")
 
         ax[1].axhspan(0, 1, facecolor='lightgray', alpha=0.5)  
         ax[1].fill_between(doy_vector, 
-                           1-self.scores_l2["skill_scores_upper"], 
-                           1-self.scores_l2["skill_scores_lower"], 
+                           self.scores_l2["skill_scores_upper"], 
+                           self.scores_l2["skill_scores_lower"], 
                            alpha = 0.3,
                            color = "blue")
-        ax[1].plot(doy_vector, 1-self.scores_l2["skill_scores_mean"], color="darkblue", label="SMOSMANIA")
+        ax[1].plot(doy_vector, self.scores_l2["skill_scores_mean"], color="darkblue", label="SMOSMANIA")
         #ax[1].legend(prop=self.legend_properties, frameon=True)
 
         ax[2].axhspan(0, 1, facecolor='lightgray', alpha=0.5)  
         ax[2].fill_between(doy_vector, 
-                           1- self.scores_l3["skill_scores_upper"], 
-                           1- self.scores_l3["skill_scores_lower"], 
+                           self.scores_l3["skill_scores_upper"], 
+                           self.scores_l3["skill_scores_lower"], 
                            alpha = 0.3,
                            color = "blue")
-        ax[2].plot(doy_vector, 1-self.scores_l3["skill_scores_mean"], color="darkblue", label="SMOSMANIA")
+        ax[2].plot(doy_vector, self.scores_l3["skill_scores_mean"], color="darkblue", label="SMOSMANIA")
         #ax[2].legend(prop=self.legend_properties, frameon=True)
         ax[2].set_xlabel(self.xlabel, **self.label_properties)
 

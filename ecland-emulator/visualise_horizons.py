@@ -124,9 +124,14 @@ def visualise(df):
             patch.set_facecolor(colors[column]["facecolor"])
             patch.set_edgecolor(colors[column]["edgecolor"])
             patch.set_linewidth(1.5)
-        for median in box['medians']:
-            median.set_color("black")
-            median.set_linewidth(1.5)
+        for j, median in enumerate(box['medians']):
+            median.set_color("orange")
+            median.set_linewidth(1.8)
+            median_value = median.get_ydata()[0]
+            # Add the median value text above the box
+            axs[i].text(j + 1, 10, f"{median_value}", 
+                        ha='center', va='bottom', fontdict={'size': 14, 'weight': 'bold'})
+
 
     #fig.text(0.5, 0.04, 'Horizon Type', ha='center', fontdict=label_properties)
 
@@ -137,13 +142,21 @@ def visualise(df):
 
 if __name__ == "__main__":
 
-    use_stations = {'Condom':'Silty clay', 'Villevielle':'Sandy loam', 'LaGrandCombe':'Loamy sand', 
-                    'Narbonne':'Clay', 'Urgons':'Silt loam','LezignanCorbieres':'Sandy clay loam',
-                    'CabrieresdAvignon':'Sandy clay loam', 'Savenes':'Loam', 'PeyrusseGrande':'Silty clay',
-                    'Sabres':'Sand', 'Montaut':'Silt loam', 'Mazan-Abbaye':'Sandy loam',
-                    'Mouthoumet':'Clay loam','Mejannes-le-Clap':'Loam', 'CreondArmagnac':'Sand', 
-                    'SaintFelixdeLauragais':'Loam'}
-
+    if VARIABLE == 'st':
+        use_stations = {'Condom':'Silty clay', 'Villevielle':'Sandy loam', 'LaGrandCombe':'Loamy sand', 
+                        'Narbonne':'Clay', 'Urgons':'Silt loam','LezignanCorbieres':'Sandy clay loam',
+                        'CabrieresdAvignon':'Sandy clay loam', 'Savenes':'Loam', 'PeyrusseGrande':'Silty clay',
+                        'Sabres':'Sand', 'Montaut':'Silt loam', 'Mazan-Abbaye':'Sandy loam',
+                        'Mouthoumet':'Clay loam','Mejannes-le-Clap':'Loam', 'CreondArmagnac':'Sand', 
+                        'SaintFelixdeLauragais':'Loam'}
+    elif VARIABLE == 'sm':
+        use_stations = {'Condom':'Silty clay', 'LaGrandCombe':'Loamy sand', 
+                        'Urgons':'Silt loam','LezignanCorbieres':'Sandy clay loam',
+                        'Savenes':'Loam', 'Mazan-Abbaye':'Sandy loam',
+                        'Mouthoumet':'Clay loam','CreondArmagnac':'Sand', 
+                        }
+    else:
+        print("Don't know variable.")
 
 
     horizons_data = []

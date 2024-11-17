@@ -61,13 +61,21 @@ if __name__ == "__main__":
 
     #use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
     #                'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
-    #                'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais']
+    #                'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais',
+    #                'Mazan-Abbaye', 'LezignanCorbieres']
 
     #use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'SaintFelixdeLauragais','PeyrusseGrande',
     #                'Mouthoumet', 'Mejannes-le-Clap', 'CreondArmagnac']
-
-    use_stations = ['Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
-                    'LaGrandCombe', 'CreondArmagnac', 'Urgons', 'Condom']
+    if VARIABLE == 'sm':
+        use_stations = ['Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
+                        'LaGrandCombe', 'CreondArmagnac', 'Urgons', 'Condom']
+    elif VARIABLE =='st':
+        use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
+                    'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
+                    'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais',
+                    'Mazan-Abbaye', 'LezignanCorbieres']
+    else:
+        print("Don't know which stations to use")
 
     stations_dict = {}
     for station in use_stations:
@@ -76,7 +84,7 @@ if __name__ == "__main__":
         stations_dict[station] = layers
 
     forecast_dict = {}
-    for station in use_stations[:7]:
+    for station in use_stations:
         with open(f"ecland-emulator/results/SMOSMANIA_{station}_2022_{VARIABLE}_ensemble_fc.yaml", 'r') as f:
             layers_fc = yaml.load(f, Loader=yaml.UnsafeLoader)
         forecast_dict[station] = layers_fc
