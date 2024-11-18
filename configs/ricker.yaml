@@ -40,4 +40,4 @@ chaotic:
     stochastic: 0.05
     deterministic:
 
-path_to_plots: "c-ricker/plots"
+path_to_plots: "c_ricker/plots"

@@ -505,6 +505,8 @@ def create_thresholds_assembled_plot(thresholds_assembled, output_file):
         ax.yaxis.labelpad = 10
 
     plt.tight_layout()
+
+    plt.grid(False)
     plt.savefig(output_file, format='pdf')
     plt.close()
 

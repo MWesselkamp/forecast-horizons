@@ -210,7 +210,7 @@ class VisualisationModule:
                    alpha=0.7)
         ax[1].hlines(0, xmin=0, xmax=time_horizon, colors="black", linestyles="--")
         ax[1].set_xlabel(self.xlabel, **self.label_properties)
-        ax[1].set_ylabel("PPP - $\\varrho$", **self.label_properties)
+        ax[1].set_ylabel("$\mathbf{\\varrho}-$PPP", **self.label_properties)
         ax[1].tick_params(axis='both', which='major', labelsize=16)
 
         fig.align_ylabels(ax)  # Align y-axis labels for both subplots
@@ -254,7 +254,7 @@ class VisualisationModule:
                    color="blue", label="Species 2", alpha=0.7)
         ax[1].hlines(0, xmin=0, xmax=time_horizon, colors="black", linestyles="--")
         ax[1].set_xlabel(self.xlabel, **self.label_properties)
-        ax[1].set_ylabel("PPP - $\\varrho$", **self.label_properties)
+        ax[1].set_ylabel("$\mathbf{\\varrho}-$PPP", **self.label_properties)
         ax[1].tick_params(axis='both', which='major', labelsize=16)
 
         fig.align_ylabels(ax)  # Align y-axis labels for both subplots
@@ -304,7 +304,7 @@ class VisualisationModule:
                    alpha=0.8)
         ax[1].hlines(0, xmin=0, xmax=time_horizon, colors="black", linestyles="--")
         ax[1].set_xlabel(self.xlabel, **self.label_properties)
-        ax[1].set_ylabel("PPP - $\\varrho$", **self.label_properties)
+        ax[1].set_ylabel("$\mathbf{\\varrho}-$PPP", **self.label_properties)
         ax[1].tick_params(axis='both', which='major', labelsize=16)
 
         fig.align_ylabels(ax)  # Align y-axis labels for both subplots

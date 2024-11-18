@@ -2,10 +2,10 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 
-from ricker.visualisation_module import *
-from ricker.settings import *
-from ricker.models import *
-from ricker.evaluation_module import *
+from c_ricker.visualisation_module import *
+from c_ricker.settings import *
+from c_ricker.models import *
+from c_ricker.evaluation_module import *
 
 config = load_config("configs/ricker.yaml")
 observation_params = config['chaotic']['observation_params']
