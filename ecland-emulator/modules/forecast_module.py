@@ -9,7 +9,7 @@ import time
 import torch
 
 from torch import tensor
-from models import *
+from misc.models import *
 from data_module import *
 from abc import ABC, abstractmethod
 from tests.test_model import *
@@ -140,11 +140,12 @@ class ForecastModule(ABC):
 
 class ForecastModuleMLP(ForecastModule):
 
-    def initialise_dataset(self):
+    def initialise_dataset(self, initial_time):
 
         dataset = EcDatasetMLP(self.config,
                     self.config["test_start"],
-                    self.config["test_end"])
+                    self.config["test_end"],
+                    initial_time)
 
         self.input_clim_dim = len(dataset.static_feat_lst)
         self.input_met_dim = len(dataset.dynamic_feat_lst)
@@ -203,11 +204,12 @@ class ForecastModuleMLP(ForecastModule):
 
 class ForecastModuleLSTM(ForecastModule):
 
-    def initialise_dataset(self):
+    def initialise_dataset(self, initial_time):
 
         dataset = EcDatasetLSTM(self.config,
                     self.config["test_start"],
-                    self.config["test_end"])
+                    self.config["test_end"],
+                    initial_time)
 
         self.input_clim_dim = len(dataset.static_feat_lst)
         self.input_met_dim = len(dataset.dynamic_feat_lst)
@@ -295,11 +297,12 @@ class ForecastModuleLSTM(ForecastModule):
 
 class ForecastModuleXGB(ForecastModule):
 
-    def initialise_dataset(self):
+    def initialise_dataset(self, initial_time):
 
         dataset = EcDatasetXGB(self.config,
                     self.config["test_start"],
-                    self.config["test_end"])
+                    self.config["test_end"],
+                    initial_time)
 
         self.input_clim_dim = len(dataset.static_feat_lst)
         self.input_met_dim = len(dataset.dynamic_feat_lst)

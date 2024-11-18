@@ -93,12 +93,12 @@ device:
 
 model: "lstm"
 #model_path: "ecland-emulator/lstm/checkpoints"
-model_path: "../lstm/checkpoints"
+model_path: "ecland-emulator/lstm/checkpoints"
 climatology_path: # "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"
 
 logging:
    logger: "csv"
-   location: "../results"
+   location: "ecland-emulator/results"
    project: "lstm"
    name: "europe"
    region: "gevenich"

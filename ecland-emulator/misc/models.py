@@ -9,7 +9,7 @@ import torchmetrics
 
 from torch import tensor
 
-from helpers import r2_score_multi
+from misc.helpers import r2_score_multi
 from pytorch_lightning.utilities import grad_norm
 
 
