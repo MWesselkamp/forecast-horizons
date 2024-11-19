@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 import os
 
-from visualisations import plot_losses, plot_posterior
+from visualisation_module import *
 from torch.utils.data import DataLoader
 from data import SimODEData
 from neuralforecast.losses.pytorch import sCRPS, QuantileLoss
@@ -11,7 +11,7 @@ class Trainer:
     Trainer class to fit the Ricker_Ensemble model to data generated with the RickerPredation class.
     """
 
-    def __init__(self, y_train, sigma_train, x_train, dir):
+    def __init__(self, y_train, sigma_train, x_train, config, dir):
         """
         Initialize the Trainer with data.
 
@@ -26,6 +26,7 @@ class Trainer:
         self.x_train = x_train
         self.dir = dir
         self.fitted_values_file = os.path.join(dir, 'fitted_values.csv')
+        self.PlotRicker = VisualisationModule(config)
 
     def train(self, model, epochs, loss_fun='mse', step_length=2, fit_sigma=None):
         """
@@ -114,8 +115,8 @@ class Trainer:
             fitted_values_df = pd.DataFrame(fitted_values)
             fitted_values_df.to_csv(self.fitted_values_file, index=False)
 
-            plot_posterior(fitted_values_df, saveto=self.dir)
-            plot_losses(losses, loss_fun=kwargs.get('loss_fun', 'mse'), saveto=self.dir)
+            self.PlotRicker.plot_posterior(fitted_values_df)
+            self.PlotRicker.plot_losses(losses, loss_fun=kwargs.get('loss_fun', 'mse'))
         else:
             print("Loading parameters from previous fit.")
             fitted_values_df = pd.read_csv(self.fitted_values_file)

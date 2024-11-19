@@ -5,13 +5,17 @@ import gc
 import numpy as np
 import SALib as sb
 
-from ricker.visualisations import *
+from ricker.visualisation_module import *
 from ricker.settings import *
 from ricker.models import *
 from utils import *
 from ricker.evaluation_module import EvaluationModule
 
 set_seed(42)
+
+#=======================#
+# Ensemble  sensitivity #
+#=======================#
 
 config = load_config("configs/ricker.yaml")
 observation_params = config['chaotic']['observation_params']
@@ -70,9 +74,29 @@ def run_experiment(initial_conditions, observation_params, observation_noise, en
     del climatology, ensemble, observed_data
     gc.collect()
 
-    return [horizon_species1, horizon_species2]
+    return [horizon_species1, horizon_species2, PPP_threshold_species1, PPP_threshold_species2]
 
-horizon_species1, horizon_species2 = run_experiment(initial_conditions, observation_params, observation_noise, ensemble_size)
+ensemble_sizes = list(range(5, 100, 1))
+horizons1 = []
+horizons2 = []
+ppp_rho1 = []
+ppp_rho2 = []
+for ens_size in ensemble_sizes:
+
+    horizon_species1, horizon_species2, PPP_threshold_species1, PPP_threshold_species2 = run_experiment(initial_conditions,
+                                                                                                        observation_params,
+                                                                                                        observation_noise,
+                                                                                                        ens_size)
+    horizons1.append(horizon_species1)
+    horizons2.append(horizon_species2)
+    ppp_rho1.append(PPP_threshold_species1)
+    ppp_rho2.append(PPP_threshold_species2)
+
+
+#=======================#
+# Parameter sensitivity #
+#=======================#
+
 
 problem = {
     'num_vars': 2,

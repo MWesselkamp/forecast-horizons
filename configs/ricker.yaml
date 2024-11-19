@@ -35,22 +35,9 @@ chaotic:
   observation_noise:
     stochastic: 0.05
     deterministic: 0.05
+
   initial_noise:
     stochastic: 0.05
     deterministic:
 
-nonchaotic:
-
-  initial_conditions:
-      species1: 1.1
-      species2: 1.1
-
-  observation_params: [0.18, 1, -0.1, 0.41, 0.25, 0.16, 1, 0.3, 0.32, 0.32]
-  initial_params: [0.087132, 0.865437, 0.34348, 0.315365]
-
-  observation_noise:
-    stochastic: 0.05
-    deterministic: 0.05
-  initial_noise:
-    stochastic: 0.05
-    deterministic:
+path_to_plots: "c_ricker/plots"

@@ -123,21 +123,21 @@ def create_site_index_boundaries_plot(measurements, predictions,
 
     grouped_df = measured_yield_class_rho2.groupby('dGz100')
     for name, group in grouped_df:
-        axs[0].plot(group['Alter'], group['Ho'], color="red", linewidth=2.5)
+        axs[0].plot(group['Alter'], group['Ho'], color="red", linewidth=2)
     grouped_df = measured_yield_class_rho1.groupby('dGz100')
     for name, group in grouped_df:
-        axs[0].plot(group['Alter'], group['Ho'], color="salmon", linewidth=2.5)
+        axs[0].plot(group['Alter'], group['Ho'], color="salmon", linewidth=2)
     grouped_df = measured_yield_class_rho3.groupby('dGz100')
     for name, group in grouped_df:
-        axs[0].plot(group['Alter'], group['Ho'], color="darkred", linewidth=2.5)
+        axs[0].plot(group['Alter'], group['Ho'], color="darkred", linewidth=2)
     reference_yield_class = measurements_df.query(f"dGz100 == {site_index}")
-    axs[0].plot(reference_yield_class['Alter'], reference_yield_class['Ho'], color="black", label="Reference", linewidth=2.5)
+    axs[0].plot(reference_yield_class['Alter'], reference_yield_class['Ho'], color="black", label="Reference", linewidth=2)
     bias = []
     for idx in predictions_df['rid'].unique():
         predicted_yield_class = dm.select_predictions_plot(predictions_df, idx)
         predicted_yield_class_sparse = predicted_yield_class[predicted_yield_class['age'] % 5 == 0]
         bias.append(absolute_differences(predicted_yield_class_sparse['dominant_height'].values, reference_yield_class['Ho'].values))
-        axs[0].plot(predicted_yield_class['age'], predicted_yield_class['dominant_height'], color="blue", linewidth=2.5)
+        axs[0].plot(predicted_yield_class['age'], predicted_yield_class['dominant_height'], color="blue", linewidth=2)
 
     axs[0].plot([], [], color="red", label="Standard")
     axs[0].plot([], [], color="blue", label="Forecast")
@@ -145,17 +145,21 @@ def create_site_index_boundaries_plot(measurements, predictions,
     axs[0].set_ylabel('Dominant height [m]', fontsize=16, fontweight = 'bold')
     axs[0].tick_params(axis='x', labelrotation=45, labelsize=16)
     axs[0].tick_params(axis='y', labelsize=16)
-    bold_font = font_manager.FontProperties(weight='bold', size=16)
-    axs[0].legend(title=f'Picea Abies (k={site_index})', fontsize=14, title_fontproperties=bold_font,
+    bold_font = font_manager.FontProperties(size=14)
+    axs[0].legend(title=f'Picea $\\it{{abies}}$ (k={site_index})', fontsize=14, title_fontproperties=bold_font,
                   loc = "upper left")
+    axs[0].grid(False)
 
     #axs[1].plot(predicted_yield_class_sparse['age'], ae_ex.transpose(), color="blue", linewidth=2.5)
-    axs[1].plot(predicted_yield_class_sparse['age'], rho_g.transpose(), color="red", linewidth=2.5)
+    axs[1].plot(predicted_yield_class_sparse['age'], rho_g.transpose(), color="salmon", linewidth=2)
     axs[1].plot(predicted_yield_class_sparse['age'], np.array(bias).transpose(), color = "darkblue", linewidth=2)
     axs[1].set_xlabel('Time [Age]', fontsize=16, fontweight = 'bold')
     axs[1].set_ylabel('Absolute error', fontsize=16, fontweight = 'bold')
     axs[1].tick_params(axis='x', labelrotation=45, labelsize=16)
     axs[1].tick_params(axis='y', labelsize=16)
+    axs[1].grid(False)
+
+    fig.align_ylabels(axs)
 
     plt.tight_layout()
     plt.savefig(save_to, format='pdf')
@@ -430,14 +434,14 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
 
     # Set labels
     plt.xlabel("Lead time [age]", fontsize=18, fontweight = 'bold')
-    plt.ylabel("AE - $\mathbf{\\rho}$ [m]", fontsize=18, fontweight = 'bold')
+    plt.ylabel("$\mathbf{\\varrho}-$AE [m]", fontsize=18, fontweight = 'bold')
 
     bold_font = font_manager.FontProperties(weight='bold', size=16)
     plt.legend(fontsize=14,
                ncol = 3,
                loc='upper center',
                title_fontproperties=bold_font,
-               prop={'weight': 'bold', 'size':14})
+               prop={'size':14})
 
     # Apply minimal theme and rotate x-axis labels
     plt.xticks(rotation=45, fontsize=16)
@@ -501,6 +505,8 @@ def create_thresholds_assembled_plot(thresholds_assembled, output_file):
         ax.yaxis.labelpad = 10
 
     plt.tight_layout()
+
+    plt.grid(False)
     plt.savefig(output_file, format='pdf')
     plt.close()
 
@@ -577,7 +583,7 @@ def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
     #ax.set_yticks(new_y_ticks)
     #ax.set_yticklabels([f'{int(yt)}' for yt in new_y_ticks])
 
-    ax.set_xlabel('$\mathbf{\\rho}$ [m]', fontsize=18, fontweight = 'bold')
+    ax.set_xlabel('$\mathbf{\\varrho}$ [m]', fontsize=18, fontweight = 'bold')
     ax.set_ylabel('Forecast horizon [years]', fontsize=18, fontweight = 'bold')
     ax.tick_params(axis='both', labelsize=18)
 

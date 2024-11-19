@@ -10,6 +10,10 @@ ecland-emulator/mlp
 ecland-emulator/xgb
 ecland-emulator/analyses
 
+c_ricker/unused
+c_ricker/plots
+c_ricker/results
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
