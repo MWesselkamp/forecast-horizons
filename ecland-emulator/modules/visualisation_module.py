@@ -200,7 +200,7 @@ class VisualisationSingle(VisualisationClass):
         plt.show()
 
     def plot_horizons(self, scores_l1, scores_l2, scores_l3, threshold,
-                      scores_l1_std = None, scores_l2_std = None, scores_l3_std = None, hod = None, log_y=True):
+                      scores_l1_std = None, scores_l2_std = None, scores_l3_std = None, hod = None, log_y=False):
 
         if hod is None:
             doy_vector = self.doy_vector[:self.maximum_leadtime]

@@ -593,7 +593,7 @@ class Transform:
         - Original data array before normalization.
         """   
 
-        data_array = self._to_tensor(data_array)
+        normalized_data = self._to_tensor(normalized_data)
 
         if self.transform['min'] is None or self.transform['max'] is None:
             raise ValueError("Transform parameters (min and max) are not set. Perform normalization first.")

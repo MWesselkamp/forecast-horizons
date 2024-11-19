@@ -12,6 +12,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR)
 
+from modules.data_module import Transform
 from abc import ABC, abstractmethod
 from matplotlib.colors import BoundaryNorm
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, root_mean_squared_error
@@ -50,9 +51,9 @@ class EvaluationBasic:
         self.fc_numerical = fc_numerical
         self.fc_emulator = fc_emulator
 
-    def transform(self, Transform):
+    def transform(self, use_min_max=False):
 
-        self.Transform = Transform
+        self.Transform = Transform(use_min_max=use_min_max)
         self.Transform.compute_global_min_max(self.observations, 
                                          self.fc_numerical,
                                          self.fc_emulator)
@@ -61,17 +62,30 @@ class EvaluationBasic:
         self.fc_numerical = self.Transform.normalise(self.fc_numerical)
         self.fc_emulator = self.Transform.normalise(self.fc_emulator)
 
+    def inv_transform(self, data_array):
+        return self.Transform.inv_normalise(data_array)
+
     def subset_samples(self):
         
-        self.observations = self.observations[:self.maximum_evaluation_time, :, self.layer_index]
-        self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, :, self.variable_indices[self.layer_index]]
-        self.fc_emulator = self.fc_emulator[:self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]] 
+        self.observations = self.observations[..., self.layer_index]
+        self.fc_numerical = self.fc_numerical[..., self.variable_indices[self.layer_index]]
+        self.fc_emulator = self.fc_emulator[..., self.variable_indices[self.layer_index]] 
         
         print("Shape of subset fc_emulator: ", self.fc_emulator.shape)
         print("Shape of subset observations: ", self.observations.shape)
         print("Shape of subset fc_numerical: ", self.fc_numerical.shape)
 
         return [self.observations,self.fc_numerical, self.fc_emulator]
+    
+    def slice_evluation_times(self):
+        
+        self.observations = self.observations[:self.maximum_evaluation_time, ...]
+        self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, ...]
+        self.fc_emulator = self.fc_emulator[:self.maximum_evaluation_time,...] 
+        
+        print("Shape of subset fc_emulator: ", self.fc_emulator.shape)
+        print("Shape of subset observations: ", self.observations.shape)
+        print("Shape of subset fc_numerical: ", self.fc_numerical.shape)
 
     def _to_tensor(self, x):
 
@@ -161,11 +175,11 @@ class EnsembleEvaluation(EvaluationBasic):
 
         print("STACKED EMUATOR SHAPE: ", self.fc_emulator.shape)
 
-    def subset_samples(self):
+    def slice_evluation_times(self):
         
-        self.observations = self.observations[:self.maximum_evaluation_time, :, self.layer_index]
-        self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, :, self.variable_indices[self.layer_index]]
-        self.fc_emulator = self.fc_emulator[:, :self.maximum_evaluation_time,:, self.variable_indices[self.layer_index]] 
+        self.observations = self.observations[:self.maximum_evaluation_time,...]
+        self.fc_numerical = self.fc_numerical[:self.maximum_evaluation_time, ...]
+        self.fc_emulator = self.fc_emulator[:, :self.maximum_evaluation_time,...] 
         
         print("Shape of subset fc_emulator: ", self.fc_emulator.shape)
         print("Shape of subset observations: ", self.observations.shape)

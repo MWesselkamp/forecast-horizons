@@ -3,10 +3,12 @@ analyses/
 plots/
 results/
 shell_scripts/
+configs/
 
 ecland-emulator/lstm
 ecland-emulator/mlp
 ecland-emulator/xgb
+ecland-emulator/analyses
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

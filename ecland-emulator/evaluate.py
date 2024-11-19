@@ -83,6 +83,8 @@ def assemble_forecasts(observations,
                                 fc_numerical=fc_numerical,
                                 fc_emulator=fc_emulators)
         subsetted_data = EvaluateModel.subset_samples()
+        subsetted_data = EvaluateModel.slice_evluation_times()
+
         print("Observation subset shape:", subsetted_data[0].shape)
         print("Numerical subset shape:", subsetted_data[1].shape)
         print("Emulator subset shape:", subsetted_data[2].shape)
@@ -108,25 +110,28 @@ def evaluate_ensemble(observations,
                                 fc_numerical=fc_numerical,
                                 fc_emulator=fc_emulators)
 
-            DataTransform = Transform(use_min_max=False)
-            EvaluateModel.transform(DataTransform)
-            
             EvaluateModel.subset_samples()
+            EvaluateModel.slice_evluation_times()
 
+            EvaluateModel.transform(use_min_max=False)
+            
             numerical_score = EvaluateModel.evaluate_numerical()
-            ensemble_score = EvaluateModel.evaluate_emulator()
+            ensemble_score, ensemble_score_dispersion = EvaluateModel.evaluate_emulator()
             ensemble_skill = EvaluateModel.get_skill_score()
+
+            ensemble_score_shifted = EX_CONFIG['tolerance'] - ensemble_score
+            numerical_score_shifted = EX_CONFIG['tolerance'] - numerical_score
 
             scores = {}
             shifted_scores = {}
             scores_dispersion = {}
             skill_scores = {}
-            scores["ECLand"] = numerical_score
-            scores["Emulators"] = ensemble_score[0]
-            shifted_scores["ECLand"] = EX_CONFIG['tolerance'] - numerical_score
-            shifted_scores["Emulators"] = EX_CONFIG['tolerance'] - ensemble_score[0]
-            scores_dispersion["Emulators"] = ensemble_score[1]
-            skill_scores["Emulators"] = ensemble_skill
+            scores["ECLand"] = EvaluateModel.inv_transform(numerical_score)
+            scores["Emulators"] = EvaluateModel.inv_transform(ensemble_score)
+            shifted_scores["ECLand"] = EvaluateModel.inv_transform(numerical_score_shifted)
+            shifted_scores["Emulators"] = EvaluateModel.inv_transform(ensemble_score_shifted)
+            scores_dispersion["Emulators"] = EvaluateModel.inv_transform(ensemble_score_dispersion)
+            skill_scores["Emulators"] = EvaluateModel.inv_transform(ensemble_skill)
 
             layers[f"layer{layer}"] = {}
             layers[f"layer{layer}"]["scores"] = scores
@@ -157,19 +162,23 @@ def evaluate_point(observations,
                 EvaluateModel.set_samples(observations=observations,
                                     fc_numerical=fc_numerical,
                                     fc_emulator=fc_emulator)
-                DataTransform = Transform(use_min_max=False)
-                EvaluateModel.transform(DataTransform)
-
+                
                 EvaluateModel.subset_samples()
+                EvaluateModel.slice_evluation_times()
+
+                EvaluateModel.transform(use_min_max=False)
 
                 numerical_score = EvaluateModel.evaluate_numerical()
                 emulator_score, _ = EvaluateModel.evaluate_emulator()
                 skill_score = EvaluateModel.get_skill_score()
 
+                emulator_score_shifted = EX_CONFIG['tolerance'] - emulator_score
+                numerical_score_shifted = EX_CONFIG['tolerance'] - numerical_score
+
                 scores["ECLand"] = numerical_score
                 scores[mod] = emulator_score
-                shifted_scores["ECLand"] = EX_CONFIG['tolerance'] - numerical_score
-                shifted_scores[mod] = EX_CONFIG['tolerance'] - emulator_score
+                shifted_scores["ECLand"] = numerical_score_shifted
+                shifted_scores[mod] = emulator_score_shifted
                 skill_scores[mod] = skill_score
                 
             layers[f"layer{layer}"] = {}
@@ -295,9 +304,6 @@ if __name__ == "__main__":
                     fc_emulators=fc_emulators,
                     score=EX_CONFIG['score'] ,
                     maximum_leadtime= MAXIMUM_LEADTIME)
-    
-    print_nested_dict_structure(layers_ensemble)
-    print_nested_dict_structure(layers_point)
 
     layer_horizons = ensemble_horizons(layers_ensemble)
 
@@ -335,6 +341,9 @@ if __name__ == "__main__":
                                                 fc_emulators, 
                                                 station_data,
                                                 matching_indices= matching_indices)
+        
+        PointPlots.plot_horizons(layers_point['layer0']['scores'], layers_point['layer1']['scores'], layers_point['layer2']['scores'],
+                                threshold = EX_CONFIG["tolerance"])
         
         EnsemblePlots.plot_scores(layers_ensemble['layer0']['scores'], layers_ensemble['layer1']['scores'], layers_ensemble['layer2']['scores'], log_y=False)
         EnsemblePlots.plot_skill_scores(layers_ensemble['layer0']['skill_scores'], layers_ensemble['layer1']['skill_scores'], layers_ensemble['layer2']['skill_scores'], 
