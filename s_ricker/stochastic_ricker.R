@@ -61,7 +61,7 @@ run_simulation <- function(r, k, N_init, sigma.N, error_size){
 }
 
 ne = 500 # Ensemble size. production run should be 200 - 5000, depending on what your computer can handle
-horiz = 100 #days, forecast horizon during forecast
+horiz = 150 #days, forecast horizon during forecast
 
 # Initial conditions
 N_init <- 1
@@ -77,6 +77,9 @@ output <- run_simulation(r = r, k=k, N_init = N_init, sigma.N = sigma.N, error_s
 output_med <- apply(output[,,1], 1, quantile, 0.5)
 output_qupper <- apply(output[,,1], 1, quantile, 0.975)
 output_qlower <- apply(output[,,1], 1, quantile, 0.025)
+
+output_qupper_m <- apply(output[,,1], 1, quantile, 0.75)
+output_qlower_m <- apply(output[,,1], 1, quantile, 0.25)
 
 lines(output_qupper,type="l", lty=2)
 lines(output_med)
@@ -115,16 +118,17 @@ observations <- function(r, k, N_init, sigma.N, error_size, tsteps){
 }
 
 dat_train <- observations(r = r, k=k, N_init = N_init, sigma.N = sigma.N, error_size = error_size, tsteps = horiz)
+true_dynamic <- dat_train$dyn.true
 
 lines(dat_train$dyn.true, type = "l", col="red")
 lines(dat_train$dyn.proc)
 
 ensemble_mean_error <- mapply(ae, ens_mean, dat_train$dyn.true)
-plot(error, type = "l")
-cor(error, ens_spread)
+plot(ensemble_mean_error, type = "l")
+cor(ensemble_mean_error, ens_spread)
 
 plot(ens_spread, type="l")
-lines(error, type="l", col="red")
+lines(ensemble_mean_error, type="l", col="red")
 
 # ========== # 
 # Fancy Plot #
@@ -138,22 +142,22 @@ matplot(output[,,1], type="l", col = light_gray,
         xlab = "Lead time [Generation]", ylab="Relative population size", 
         cex.axis=1.5, 
         font.lab=2)
-lines(output_med, type="l", 
+lines(apply(output[,,1], 1, mean), type="l", 
       ylim = c(0,2), 
       lwd=2,
       col="blue")
-lines(output_qupper, lty=1, 
+lines(apply(output[,,1], 1, mean) + 2*ens_spread, lty=2, 
       lwd=2, col="blue")
-lines(output_qlower, lty=1,
+lines(apply(output[,,1], 1, mean) - 2*ens_spread, lty=2,
       lwd=2, col="blue")
 
 lines(dat_train$dyn.true, type = "l",lwd=2, col = "magenta")
 #lines(dat_train$dyn.proc, col= "red")
 abline(h = 0.01, col="black")
 
-legend("topleft", legend = c("Ensemble Quantiles", "Observations"),
-       col = c("blue", "magenta"),
-       lty = c(1, 1, 1, 1), 
+legend("bottomright", legend = c("Ensemble Mean", "95% Conf.-Int.", "Observations"),
+       col = c("blue", "blue", "magenta"),
+       lty = c(1, 2, 1, 1), 
        lwd = c(1, 1.5, 1.5, 1.5), 
        bty = "n",
        cex=1.3)
@@ -166,9 +170,13 @@ ensemble_error <- apply(output[,,1], 2, function(row, true_value) {
   ae(row, true_value)
 }, true_value = dat_train$dyn.true)
 
+
+mean_ensemble_error <- apply(ensemble_error, 1, mean)
 med_ensemble_error <- apply(ensemble_error, 1, median)
 qu_ensemble_error <- apply(ensemble_error, 1, quantile, 0.975)
 ql_ensemble_error <- apply(ensemble_error, 1, quantile, 0.025)
+CIu_ensemble_error <- mean_ensemble_error + 2*apply(ensemble_error, 1, sd)
+CIl_ensemble_error <- mean_ensemble_error - 2*apply(ensemble_error, 1, sd)
 
 #q_error_u <- mapply(ae, ens_mean, output_qupper)
 #q_error_l <- mapply(ae, ens_mean, output_qlower)
@@ -180,29 +188,44 @@ matplot(ensemble_error, type = "l", lty =1, col = light_gray,
         font.lab=2)
 
 # Add lines to the plot
-lines(med_ensemble_error, col = "black", lty = 1, lwd = 1.5)
-lines(ensemble_mean_error, col = "black", lty = 2, lwd = 1.5)
+#lines(med_ensemble_error, col = "blue", lty = 1, lwd = 1.5)
+#lines(mean_ensemble_error, col = "black", lty = 1, lwd = 1.5)
+lines(ensemble_mean_error, col = "black", lty = 1, lwd = 1.5)
 lines(qu_ensemble_error, col = "blue", lty = 1, lwd = 1.5)
 lines(ql_ensemble_error, col = "blue", lty = 1, lwd = 1.5)
-lines(2 * ens_spread, col = "red", lty = 1, lwd = 1.5)
+lines(ens_spread, col = "red", lty = 1, lwd = 1.5)
+lines(ens_spread*2, col = "red", lty = 2, lwd = 1.5)
 
 # Add legend
 legend("topleft", 
        legend = expression(Q["0.975, 0.025"]^{epsilon}, 
-                           Q["0.5"]^{epsilon}, 
+                           #Q["0.5"]^{epsilon}, 
                            bar(epsilon), 
                            epsilon, 
-                           2*s),
-       col = c("blue", "black","black", "gray", "red"),
-       lty = c(1, 1, 2, 1, 1), 
-       lwd = c(1.5, 1.5, 1, 1.5), 
+                           sigma,
+                           2*sigma),
+       col = c("blue", "black", "gray", "red", "red"),
+       lty = c(1, 1, 1, 1, 2), 
+       lwd = c(1.5,  1, 1.5, 1.5), 
        bty = "n",
-       cex = 1.5)
+       cex = 1.5,
+       ncol = 2)
 
 # Add secondary axis
 axis(4, at = pretty(range(ensemble_error)), labels = pretty(range(ensemble_error)))  # Add the axis on the right
 mtext("Spread", side = 4, line = 3, cex = 1.5,
       font=2)  # Add the label for the secondary axis
+
+#============================#
+# Horizon confidence interval
+#============================#
+
+par(mar = c(5, 5, 4, 5), cex.lab = 1.5, cex.axis = 1.3)
+plot(ens_spread*2 - ensemble_mean_error, type="l", lwd=2,
+     xlab = "Lead time [Generation]",
+     ylab = expression("\u03F1" - bar(epsilon)),
+     font.lab = 2)
+abline(h = 0, lty = 2)
 
 
 # =============#
@@ -211,7 +234,7 @@ mtext("Spread", side = 4, line = 3, cex = 1.5,
 
 
 
-data_matrix <- cbind(error, ens_spread)
+data_matrix <- cbind(mean_ensemble_error, ens_spread)
 
 # Rolling correlation with a window size of 5
 rolling_cor <- rollapplyr(
@@ -230,9 +253,35 @@ plot(rolling_cor, type="l",lwd=2,
      font.lab=2, ylim=c(-1,1))
 abline(h=0, lty=2)
 
+plot(ens_spread[50:150], mean_ensemble_error[50:150])
+
+plot(lm(ens_spread[30:150] ~ mean_ensemble_error[30:150]))
 
 
 
+#===========================#
+# Statistical consistency
+#===========================#
+
+shapiro_test_row <- function(row) {
+  if (length(row) < 3) {
+    return(NA) # Shapiro-Wilk test requires at least 3 observations
+  }
+  shapiro.test(row)$p.value
+}
+
+# Function to perform KS test for each pair of rows
+ks_test_row <- function(row1, row2) {
+  if (length(row1) != length(row2)) {
+    stop("Rows must have the same length")
+  }
+  ks.test(row1, row2)$p.value  # Return the p-value from the KS test
+}
+
+ks_results <- mapply(ks_test_row, split(ensemble_error, row(ensemble_error)), split(output[,,1], row(output[,,1])))
+
+# View results
+plot(ks_results, type="l")
 
 
 #============================#

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import seaborn as sns
 import tol_colors as tc
 import os
@@ -407,15 +409,15 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
     plt.figure(figsize=(7, 6))
 
     # Get unique species from the DataFrame
-    unique_species = horizons_assembled['species_fullname'].unique()
+    unique_species = sorted(horizons_assembled['species_fullname'].unique())
 
     # Define colors for each species using Matplotlib's colormap 'Set1'
     cmap = tc.tol_cmap('light')  # Extract 5 colors from the "Set1" colormap
     colors = cmap(np.linspace(0.2, 1, 5))
 
     # Plot the ribbons for standard deviations
-    for i, species in enumerate(unique_species):
-        subset = horizons_assembled[horizons_assembled['species_fullname'] == species]
+    for i in range(5):
+        subset = horizons_assembled[horizons_assembled['species_fullname'] == unique_species[i]]
         plt.fill_between(
             subset['age'],
             subset['h_means'] - 2*subset['h_sd'],
@@ -425,9 +427,9 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
         )
 
     # Plot the mean lines for each species
-    for i, species in enumerate(unique_species):
-        species_data = horizons_assembled[horizons_assembled['species_fullname'] == species]
-        plt.plot(species_data['age'], species_data['h_means'], label=species, color=colors[i], linewidth=2)
+    for i in range(5):
+        species_data = horizons_assembled[horizons_assembled['species_fullname'] == unique_species[i]]
+        plt.plot(species_data['age'], species_data['h_means'], label=unique_species[i], color=colors[i], linewidth=2)
 
     # Add horizontal dashed line at y = 0
     plt.axhline(y=0, color='black', linewidth=2, linestyle='--')
@@ -454,96 +456,6 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
     plt.savefig(output_file, format='pdf')
     plt.close()
 
-def create_thresholds_assembled_plot(thresholds_assembled, output_file):
-    # Convert the DataFrame from wide to long format
-    thresholds_assembled_long = thresholds_assembled.melt(
-        id_vars=['species_fullname'],
-        value_vars=['rho_upper', 'rho_lower'],
-        var_name='threshold',
-        value_name='rho'
-    )
-
-    # Custom labels for the facets
-    custom_labels = {"rho_lower": "Lower", "rho_upper": "Upper"}
-
-    # Increase the size of the plot panel to accommodate x-ticklabels
-    plt.figure(figsize=(14, 14))
-
-    # Facet by threshold
-    g = sns.FacetGrid(thresholds_assembled_long, col='threshold',
-                      col_wrap=2,
-                      sharey=True,
-                      height=4.5,  # Increase height of each facet for more space
-                      aspect=1.2  # Increase aspect ratio for wider panels
-    )
-    g.map_dataframe(
-        sns.boxplot,
-        x='species_fullname', y='rho', hue='species_fullname',
-        palette='Set1')
-
-    # Adjust the transparency of the boxes
-    for ax in g.axes.flat:
-        for patch in ax.artists:
-            patch.set_alpha(0.7)
-
-    g.set_axis_labels("", "Threshold [m]", fontsize=16)
-
-    # Adjust facet titles
-    for ax, title in zip(g.axes.flat, thresholds_assembled_long['threshold'].unique()):
-        ax.set_title(custom_labels[title], fontsize=16)
-
-    # Customize plot appearance and adjust x-tick labels
-    for ax in g.axes.flat:
-        ax.tick_params(axis='x', rotation=45, labelsize=14)
-        ax.tick_params(axis='y', labelsize=14)
-
-    # Adjust the layout to fix spacing issues
-    g.fig.subplots_adjust(top=0.9, bottom=0.2, left=0.1, right=0.9, hspace=0.4, wspace=0.3)
-
-    # Align y-axis labels by ensuring consistent padding
-    for ax in g.axes.flat:
-        ax.yaxis.labelpad = 10
-
-    plt.tight_layout()
-
-    plt.grid(False)
-    plt.savefig(output_file, format='pdf')
-    plt.close()
-
-def plot_age_limit_by_species(result_df, output_file):
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    # Loop through each row in the result DataFrame
-    for index, row in result_df.iterrows():
-        species = row['species_fullname']
-        mean_age = row['age']
-        plus_sd_age = row['plus_sd_age']
-        minus_sd_age = row['minus_sd_age']
-
-        # Calculate error bars
-        lower_error = mean_age - minus_sd_age if not pd.isna(minus_sd_age) else 0
-        upper_error = plus_sd_age - mean_age if not pd.isna(plus_sd_age) else 0
-
-        # Plot the mean age with error bars
-        ax.errorbar(mean_age, index, xerr=[[lower_error], [upper_error]],
-                    fmt='o',
-                    markersize=12,  # Increase marker size
-                    elinewidth=3,  # Increase error bar line width
-                    capsize=5,
-                    label=species)
-
-    ax.set_yticks(range(len(result_df)))
-    ax.set_yticklabels(result_df['species_fullname'], fontsize = 20)
-    ax.set_xlabel('Age', fontsize = 20)
-    ax.tick_params(axis='x', labelsize=20)  # Increase size of x-tick labels
-    ax.tick_params(axis='y', labelsize=20)  # Increase size of y-tick labels
-    plt.xlim((40, 115))
-    plt.grid(False)
-    plt.tight_layout()
-    plt.savefig(output_file, format='pdf')
-    plt.close()
-
-
 def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
     """
     Plot the mean age by species for multiple result DataFrames.
@@ -557,13 +469,14 @@ def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
     """
     fig, ax = plt.subplots(figsize=(8, 7))
 
-    cmap = tc.tol_cmap('light')
+    cmap = tc.tol_cmap('light')  # Extract 5 colors from the "Set1" colormap
     colors = cmap(np.linspace(0.2, 1, 5))
-    species_names = result_dfs['species_fullname'].unique()
 
-    for species_idx, species in enumerate(species_names):
+    species_names = sorted(result_dfs['species_fullname'].unique())
 
-        species_data = result_dfs.query(f"species_fullname == {repr(species)}")
+    for i in range(5):
+
+        species_data = result_dfs.query(f"species_fullname == {repr(species_names[i])}")
 
         x_values =  thresholds #list(range(1, len(species_data['mean_age'].values) + 1))
         ax.hlines(y=110 - 45, xmin=min(x_values), xmax=max(x_values), linestyles="-",
@@ -573,7 +486,7 @@ def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
         ax.vlines(x=1, ymin=45 -45 , ymax=110 - 45, linestyles="--",
                   color="black", linewidth=1.3)
         ax.plot(x_values, species_data['mean_age'].values - 45,
-                color=colors[species_idx], label=species,
+                color=colors[i], label=species_names[i],
                 markersize=10, linewidth=2.6, alpha=0.9)
         # Add filled confidence intervals for the current species
         # ax.fill_between(x_values, lower_bounds, upper_bounds, color=colors[species_idx], alpha=0.2)
@@ -586,6 +499,7 @@ def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
     ax.set_xlabel('$\mathbf{\\varrho}$ [m]', fontsize=18, fontweight = 'bold')
     ax.set_ylabel('Forecast horizon [years]', fontsize=18, fontweight = 'bold')
     ax.tick_params(axis='both', labelsize=18)
+    ax.legend()
 
     plt.tight_layout()
     plt.savefig(output_file, format='pdf')
