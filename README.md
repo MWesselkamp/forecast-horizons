@@ -1,6 +1,6 @@
 # Revisiting the ecological forecast horizon.
 
-The code that accompanies our work on actual, relative and potential system predictability. The pre-print is available on arXiv: http://arxiv.org/abs/2412.00753. We are happy about a citation if you use the code.
+The code that accompanies our work on actual, relative and potential system predictability. We are happy about a citation if you use the code.
 The four case studies revisit empirical forecast horizons are:
 
 1. Stochastic Ricker equation (s_ricker) (based on May 1976)
