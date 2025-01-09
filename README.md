@@ -8,6 +8,12 @@ The four case studies revisit empirical forecast horizons are:
 3. ML-based land surface emulator (land_emulation) (Wesselkamp et al. 2024)
 4. Individual-based forest ecosystem model (iLand) (Seidl et al. 2012)
 
+## Data for reproducability
+
+- Experiments 1. and 2. work with simulations which are generated in code.
+- Experiment 3 works with a data base that is published with DOI 10.21957/pcf3-ah06.
+- Experiment 4 runs with data, available in the iLand/data folder. 
+
 ## References
 
 - Petchey et al. (2015): DOI: https://doi.org/10.1111/ele.12443
