@@ -111,10 +111,12 @@ def plot_observations(dat_train, plot=True):
     if plot:
         plt.show()
 
-def plot_setup(ax):
+
+def plot_setup_ensemble(ax):
     ax.fill_between(np.arange(horiz),climatological_mean+2*climatological_std, climatological_mean-2*climatological_std, color = "lightgray", alpha = 0.6)
     ax.plot(np.arange(horiz), output.squeeze(), color="steelblue", linewidth=0.8, alpha =0.5)
-    ax.plot(np.full((horiz, 1), climatological_mean), color="dimgray", linewidth=0.9, label = 'Climatological average')
+    ax.plot(np.full((horiz, 1), climatological_mean), color="lightgray", linewidth=0.9, label = 'Climatological mean')
+    ax.plot(np.arange(horiz), ensemble_mean, color="blue", linewidth=0.9, alpha =0.9, label = 'Ensemble mean')
     ax.plot(np.arange(horiz), y_obs[:horiz], color="red", linewidth=0.9, alpha =0.9, label = 'Observation')
     ax.set_xlabel("Lead Time")
     ax.set_ylabel("Relative size")
@@ -123,7 +125,7 @@ def plot_setup(ax):
 def plot_mae(ax):
 
     ax.fill_between(np.arange(horiz), climatological_mean_error + climatological_mean_error_spread, climatological_mean_error - climatological_mean_error_spread, color = "lightgray", alpha = 0.6)
-    ax.plot(climatological_mean_error, color= "dimgray", label = "Climatological average")
+    ax.plot(climatological_mean_error, color= "gray", label = "Climatological average")
     ax.fill_between(np.arange(horiz), ensemble_mean_error + ensemble_mean_error_spread, ensemble_mean_error - ensemble_mean_error_spread, color = "steelblue", alpha = 0.6)
     ax.plot(ensemble_mean_error, color= "blue", label = "Ensemble average")
     ax.set_xlabel("Lead Time")
@@ -210,6 +212,87 @@ def compute_crpss_parallel(i):
     crps_clim = crps_over_time(len(y_obs_short), climatology_short, y_obs_short)
     return (1 - crps_fc/crps_clim)
 
+def plot_spreaderror_concept():
+    ax.plot(ensemble_spread.T, color = "steelblue", alpha=0.5, linewidth = 0.7)
+    ax.plot(ensemble_spread.T[:, 0], color="steelblue", alpha=0.5, linewidth = 0.7, label="Ensemble spread")
+    ax.plot(ensemble_mean_error, color ="blue", label = "Ensemble mean")
+    ax.plot(average_ensemble_spread.T, color="darkblue",  alpha=0.5, label="$\sigma_{spread}$") 
+    # ax.plot(ensemble_spread.transpose(), label = "spread")
+    ax.set_ylabel("Absolute error")
+    ax.set_xlabel("Lead Time")
+    ax.legend()
+
+def plot_crps_single():
+    ax.hlines(y=0,xmin=0,xmax=horiz, linestyles="--", colors="black")
+    ax.plot(crpss, color = "darkblue")
+    ax.set_ylabel("CRPSS")
+    ax.set_xlabel("Lead Time")
+
+def rolling_pearson(x, y, window):
+    """Computes rolling Pearson correlation over a moving window."""
+    corrs = np.full(len(x), np.nan)  # Initialize array with NaNs
+    for i in range(len(x) - window + 1):
+        corrs[i + window - 1] = np.corrcoef(x[i:i+window], y[i:i+window])[0, 1]
+    return corrs
+
+def plot_distributions_at_horizon():
+    ax[0].hist(climatological_distribution,density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="lightgray", label = "Climatology")
+    ax[0].hist(output[1,...],density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="steelblue", label = "Forecast")
+    ax[0].vlines(x = y_obs[1], ymin=0, ymax=280, color="red", label = "Observation")
+    ax[0].set_xlabel("Relative size")
+    ax[0].set_ylabel("Frequency")
+    ax[0].legend(loc="upper right")
+    ax[1].hist(climatological_distribution,density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="lightgray", label = "Climatology")
+    ax[1].hist(output[-1,...],density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="steelblue", label = "Forecast")
+    ax[1].vlines(x = y_obs[horiz], ymin=0, ymax=100, color="red", label = "Observation")
+    ax[1].set_xlabel("Relative size")
+    ax[1].set_ylabel("Frequency")
+
+def plot_distributions_at_T():
+    ax.hist(climatological_distribution,density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="lightgray", label = "Climatology")
+    ax.hist(output[-1,...],density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="steelblue", label = "Forecast")
+    ax.vlines(x = ensemble_mean[horiz-1], ymin=0, ymax=100, color="blue", label = "Ensemble mean")
+    ax.vlines(x = y_obs[-1], ymin=0, ymax=100, color="red", label = "Observation")
+    ax.set_xlabel("Relative size")
+    ax.set_ylabel("Frequency")
+    ax.legend(loc="upper right")
+
+def plot_leadtime_distribution():
+    ax.hlines( y=0, xmin = 0, xmax=horiz, linestyles="--", color = "black")
+    ax.fill_between(np.arange(horiz), daily_qupper, daily_qlower, alpha = 0.6, color = "lightgreen", label = "Interquartile range")
+    ax.plot(daily_median, color = "green", label = "Median")
+    ax.fill_between(np.arange(horiz), daily_mean + daily_std, daily_mean - daily_std, alpha = 0.6, color = "lightblue", label = "Spread")
+    ax.plot(daily_mean, color = "blue", label = "Mean")
+    ax.set_ylabel("CRPSS")
+    ax.set_xlabel("Forecast horizon")
+    ax.set_ylim((-1,1))
+    ax.legend()
+
+def plot_forecast_limit_hist():
+    ax.hist(forecast_limits_clean, bins=50, color='blue', alpha=0.7, edgecolor='black')
+    ax.set_xlabel("Forecast limit")
+    ax.set_ylabel("Frequency")
+    fig.tight_layout()
+
+def plot_forecast_limit_distribution():
+    sns.kdeplot(forecast_limits_clean, fill=True, color='lightblue', alpha=0.7, clip=(min(forecast_limits_clean), max(forecast_limits_clean)))
+    # Labels and title
+    ax.vlines(x = forecast_limit_average, ymin=0, ymax=0.035, color = "blue", label="Forecast limit mean")
+    ax.vlines(x = average_forecast_limit, ymin=0, ymax=0.035, color = "red", label="Mean forecast limit")
+    ax.set_xlabel("Forecast limit")
+    ax.set_ylabel("Smoothed Density")
+    ax.legend()
+
+def plot_spreaderror_time():
+    ax.plot(np.arange(len(spread_error_correlation)), spread_error_correlation)
+    ax.set_ylabel("Spread-error")
+    ax.set_xlabel("Lead Time")
+
+def plot_spreaderror_hist():
+    ax.hist(spread_error_correlation,density=True, bins=15, histtype='stepfilled',)
+    ax.set_xlabel("Spread-error correlation")
+    ax.set_ylabel("Frequency")
+
 horiz = 25 # forecast horizon for forecast model
 horiz_obs = 150 # forecast horizon for creating observational truth
 clim_horiz = 1000 # forecast horizon during climatological forecast
@@ -255,6 +338,7 @@ print(climatology_short.shape)
 # Run forecast from n = 0 over horiz with 500 members with error propagation in r and k and IC. 
 output = run_forecast(N_init=y_obs[0], ensemble_size=500, time_horizon=horiz)
 
+# Deterministic evaluation.
 # MAE 
 ensemble_error = abs(output.squeeze().transpose()-y_obs[:horiz].values) # Absolute error
 ensemble_mean_error = ensemble_error.mean(axis=0) # Mean absolute error
@@ -263,63 +347,76 @@ climatological_error = abs(climatology_short.squeeze().transpose() - y_obs[:hori
 climatological_mean_error = climatological_error.mean(axis=0) # mean absolute error
 climatological_mean_error_spread = climatological_error.std(axis=0) #  absolute error spread
 
-# Spread-error
-def rolling_pearson(x, y, window):
-    """Computes rolling Pearson correlation over a moving window."""
-    corrs = np.full(len(x), np.nan)  # Initialize array with NaNs
-    for i in range(len(x) - window + 1):
-        corrs[i + window - 1] = np.corrcoef(x[i:i+window], y[i:i+window])[0, 1]
-    return corrs
+fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
+plot_mae(ax = ax)
+plt.savefig("s_ricker/plots/mae.pdf")
+plt.show()
 
-spread_error_correlation = rolling_pearson(ensemble_mean_error, ensemble_mean_error_spread, window=8)
-
+# Probabilistic evaluation.
 # CRPS :Compute the crps for all time steps
 crps_fc = crps_over_time(horiz, output, y_obs)
 crps_clim = crps_over_time(horiz, climatology_short, y_obs)
 crpss = (1 - crps_fc/crps_clim)
 
 fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
-plot_setup(ax = ax)
-plt.savefig("s_ricker/plots/setup.pdf")
-plt.show()
-
-fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
-plot_mae(ax = ax)
-plt.savefig("s_ricker/plots/mae.pdf")
-plt.show()
-
-fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
-ax.hlines(y=0,xmin=0,xmax=horiz, linestyles="--", colors="black")
-ax.plot(crpss, color = "darkblue")
-ax.set_ylabel("CRPSS")
-ax.set_xlabel("Lead Time")
+plot_crps_single()
 plt.savefig("s_ricker/plots/crps.pdf")
 plt.show()
 
+# Explore ensemble statistics
+# Spread-error (Also possible: Spread-skill)
+# Ensemble spread: the spread of the ensemble members around ensemble mean error.
+# Error (skill): Ensemble mean vs. verfication (observation)
+
+ensemble_mean = np.mean(output.squeeze(),axis=1)
+ensemble_mean_error = abs(ensemble_mean - y_obs[:horiz].values) # ensemble forecast error
+ensemble_spread = abs(output.squeeze().transpose() - ensemble_mean)
+average_ensemble_spread = np.std(ensemble_spread, axis=0) # the estimate of the expected value of ensemble mean error, i.e. of forecast error.
+
+# Plot experimental setup
+# Example: a single ensemble forecast from initial time yobs 0, with climatological disrtibution and ensemble mean.
 fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
-ax.hist(spread_error_correlation,density=True, bins=15, histtype='stepfilled',)
-ax.set_xlabel("Spread-error correlation")
-ax.set_ylabel("Frequency")
-plt.savefig("s_ricker/plots/spreaderror.pdf")
+plot_setup_ensemble(ax = ax)
+plt.savefig("s_ricker/plots/setup_ensemble.pdf")
 plt.show()
 
+fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
+plot_spreaderror_concept()
+plt.savefig("s_ricker/plots/spreaderror_concept.pdf")
+plt.show()
 
+# Plot Forecast and Climatological distributions at timestep T.
+fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
+plot_distributions_at_T()
+plt.savefig("s_ricker/plots/distributions_at_T.pdf")
+plt.show()
+
+# Compute total spread error correlation with Pearsons R.
+print("Total spread-error correlation at forecast horizon: ", np.corrcoef(ensemble_mean_error, average_ensemble_spread)[0, 1])
+
+spread_error_correlation = rolling_pearson(ensemble_mean_error, average_ensemble_spread, window=8)
+
+# Plot spread error correlation in a rolling window over time
+fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
+plot_spreaderror_time()
+plt.savefig("s_ricker/plots/spreaderror_time.pdf")
+plt.show()
+
+# Plot spread error histogram.
+fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
+plot_spreaderror_hist() 
+plt.savefig("s_ricker/plots/spreaderror_hist.pdf")
+plt.show()
+
+# Plot Forecast and Climatological distributions at timestep 1 and at timestep T both in one plot.
 fig, ax = plt.subplots(2, 1, figsize = (4, 4), constrained_layout=True)
-ax[0].hist(climatological_distribution,density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="lightgray", label = "Climatology")
-ax[0].hist(output[1,...],density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="steelblue", label = "Forecast")
-ax[0].vlines(x = y_obs[1], ymin=0, ymax=280, color="red", label = "Observation")
-ax[0].set_xlabel("Relative size")
-ax[0].set_ylabel("Frequency")
-ax[0].legend(loc="upper right")
-ax[1].hist(climatological_distribution,density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="lightgray", label = "Climatology")
-ax[1].hist(output[-1,...],density=True, bins='auto', histtype='stepfilled', alpha=0.5, color="steelblue", label = "Forecast")
-ax[1].vlines(x = y_obs[horiz], ymin=0, ymax=100, color="red", label = "Observation")
-ax[1].set_xlabel("Relative size")
-ax[1].set_ylabel("Frequency")
+plot_distributions_at_horizon()
 plt.savefig("s_ricker/plots/distributions_at_horizon.pdf")
 plt.show()
 
 # Forecast for specific day at different horizons, i.e. from different initalisation of N_init from y_obs
+# Increase forecast horizon for this experiment
+
 horiz = 100
 days = 50
 
@@ -328,7 +425,6 @@ crpss_list = np.zeros((days, horiz))
 crps_clim = np.zeros((days, horiz))
 
 print("Iterating over observation days.")
-
 for day in range(days):
 
     observed_subset = y_obs[day:(day + horiz)]
@@ -346,57 +442,40 @@ for day in range(days):
 
         crps_fc[day, i] = crps_on_timestep(forecast_distribution, observed_fh)
         crpss_list[day, i] = (1 - crps_fc[day, i]/crps_clim[day, i])
-
 print("Finished iteration.")
 
 print("crps_fc:", crps_fc.shape)
 print("crps_list:", crpss_list.shape)
 
+# Compute crps statistics for plotting
 daily_mean = np.mean(crpss_list[:,::-1].transpose(),  axis=1)
 daily_std = np.std(crpss_list[:,::-1].transpose(),  axis=1)
 daily_median = np.quantile(crpss_list[:,::-1].transpose(), q = 0.5, axis=1)
 daily_qupper = np.quantile(crpss_list[:,::-1].transpose(), q = 0.75, axis=1)
 daily_qlower = np.quantile(crpss_list[:,::-1].transpose(), q = 0.25, axis=1)
 
-fig, ax = plt.subplots(1, 1, figsize = (5,4), constrained_layout = True)
-#ax.plot(crpss_list[:,::-1].transpose(), color = "lightgray", alpha = 0.7, linewidth = 0.8)
-ax.hlines( y=0, xmin = 0, xmax=horiz, linestyles="--", color = "black")
-ax.fill_between(np.arange(horiz), daily_qupper, daily_qlower, alpha = 0.6, color = "salmon", label = "Interquartile range")
-ax.plot(daily_median, color = "red", label = "Median")
-ax.fill_between(np.arange(horiz), daily_mean + daily_std, daily_mean - daily_std, alpha = 0.6, color = "lightblue", label = "Spread")
-ax.plot(daily_mean, color = "blue", label = "Mean")
-ax.set_ylabel("CRPSS")
-ax.set_xlabel("Forecast horizon")
-ax.set_title("Scoring distribution at horizon (n = 50 [days])")
-ax.set_ylim((-1,1))
-ax.legend()
-plt.savefig("s_ricker/plots/leadtime-distribution.pdf")
-plt.show()
-
-
+# Compute forecast limits from distributions at forecast horizons
 forecast_limits = np.where((crpss_list[:, ::-1] < 0).any(axis=1), np.argmax(crpss_list[:, ::-1] < 0, axis=1), np.nan)
 print(forecast_limits)
 
 forecast_limits_clean = forecast_limits[~np.isnan(forecast_limits)]
 forecast_limit_average = np.mean(forecast_limits_clean)
 average_forecast_limit = np.argmax(daily_mean < 0)
-# Compute histogram
 
+# Plot the CRPS over all days at different forecast horizons
 fig, ax = plt.subplots(1, 1, figsize = (5,4), constrained_layout = True)
-ax.hist(forecast_limits_clean, bins=50, color='blue', alpha=0.7, edgecolor='black')
-ax.set_xlabel("Forecast limit")
-ax.set_ylabel("Frequency")
-fig.tight_layout()
+plot_leadtime_distribution()
+plt.savefig("s_ricker/plots/leadtime-distribution.pdf")
+plt.show()
+
+# Histogramm of the distribution of forecast limits for all days and forecast horizons
+fig, ax = plt.subplots(1, 1, figsize = (5,4), constrained_layout = True)
+plot_forecast_limit_hist()
 plt.savefig("s_ricker/plots/forecast-limit-hist.pdf")
 plt.show()
 
+# Smoothed KDE gaussian kernel distribution of forecast limits for all days and forecast horizons
 fig, ax = plt.subplots(1, 1, figsize = (5,4), constrained_layout = True)
-sns.kdeplot(forecast_limits_clean, fill=True, color='blue', alpha=0.6, clip=(0, np.inf))
-# Labels and title
-ax.vlines(x = forecast_limit_average, ymin=0, ymax=0.035, color = "red", label="Forecast limit average")
-ax.vlines(x = average_forecast_limit, ymin=0, ymax=0.035, color = "black", label="Average forecast limit")
-ax.set_xlabel("Forecast limit")
-ax.set_ylabel("Smoothed Density")
-ax.legend()
+plot_forecast_limit_distribution()
 plt.savefig("s_ricker/plots/forecast-limit-distribution.pdf")
 plt.show()
