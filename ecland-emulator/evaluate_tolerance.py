@@ -67,6 +67,11 @@ def load_yaml(file_path):
 def check_condition(condition):
     """Helper function to check if condition is met in any element.
     """
+    condition = np.asarray(condition)
+    
+    # Debug print for validation
+    print(f"Condition array: {condition}, Type: {type(condition)}")
+    
     if np.any(condition):
         return np.argmax(condition)
     else:
