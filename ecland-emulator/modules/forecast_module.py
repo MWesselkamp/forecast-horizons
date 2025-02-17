@@ -178,7 +178,7 @@ class ForecastModuleMLP(ForecastModule):
         use_checkpoint = os.listdir(path_to_checkpoint)[-1]
         path_to_best_checkpoint = os.path.join(path_to_checkpoint, use_checkpoint)  # trainer.checkpoint_callback.best_model_path
         print("Load model from checkpoint: ", path_to_best_checkpoint)
-        checkpoint = torch.load(path_to_best_checkpoint, map_location=torch.device('cpu'))
+        checkpoint = torch.load(path_to_best_checkpoint, map_location=torch.device('cpu'), weights_only=True)
         torch.set_float32_matmul_precision("high")
         self.model.load_state_dict(checkpoint['state_dict'])
 

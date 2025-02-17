@@ -25,7 +25,7 @@ path_to_plots = 'ecland-emulator/plots/'
 path_to_results = 'ecland-emulator/results/'
 
 #EX_CONFIG = load_config(config_path = '../../configs/smosmania_st.yaml')
-EX_CONFIG = load_config(config_path = 'configs/tereno_st.yaml')
+EX_CONFIG = load_config(config_path = 'configs/tereno_sm.yaml')
 
 network =  EX_CONFIG['network'] #'soil_TERENO_ISMN_2022.nc'#'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
 network_name = network.split('_')[1]
