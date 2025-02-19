@@ -74,6 +74,24 @@ class ObservationModule:
 
         self.forcing = xr.open_zarr(data_path).data.sel(time=slice(year)).to_dataset()
 
+    def load_climatology(self, station_id, initial_time, variable = "st", file_path = "ecland-emulator/data"):
+        
+        ds = xr.open_dataset(os.path.join(file_path, "day_time_hourly_avg.nc"))
+        ds = ds.stack(time=("day_of_year", "hour"))
+        ds = ds.sortby("time")
+        st_array = ds[variable].sel(station_id=station_id).values
+
+        ds = xr.open_dataset(os.path.join(file_path, "day_time_hourly_std.nc"))
+        ds = ds.stack(time=("day_of_year", "hour"))
+        ds = ds.sortby("time")
+        st_array_dev = ds[variable].sel(station_id=station_id).values
+
+        st_array = st_array[:,initial_time:] # start in february
+        st_array_dev = st_array_dev[:,initial_time:]
+        
+        return st_array, st_array_dev
+
+
     def match_station_with_forcing(self):
 
         lat_a = self.network_data.lat.values  
@@ -132,11 +150,10 @@ class ObservationModule:
         t_0_datetime = pd.to_datetime(t_0)
 
         t_0_index = self.variable_data.time.get_index('time').get_loc(t_0_datetime)
-        print("Selecting from index:", t_0_index)
         t_lookback_index = t_0_index - lookback
-        print("Subtract lookback for new index:", t_lookback_index)
 
         self.variable_data_slice = self.variable_data.isel(time=slice(t_lookback_index, None))
+
         # create a doy vector for plotting.
         self.doy_vector = self.variable_data_slice['time'].values
         variable_data_tensor = torch.tensor(self.variable_data_slice.values, dtype=torch.float32)

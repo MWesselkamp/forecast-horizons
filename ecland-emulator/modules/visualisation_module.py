@@ -621,8 +621,8 @@ class VisualisationMany(VisualisationClass):
                            self.scores_l1["scores_numerical_upper"], 
                            alpha = 0.3,
                            color = "cyan")
-        ax[0].plot(doy_vector, self.scores_l1["scores_mean_emulators"], color="magenta", label="Emulator")
-        ax[0].plot(doy_vector, self.scores_l1["scores_mean_numerical"], color="cyan", label="ECLand")
+        ax[0].plot(doy_vector, self.scores_l1["scores_mean_emulators"], color="magenta", label="aiLand")
+        ax[0].plot(doy_vector, self.scores_l1["scores_mean_numerical"], color="cyan", label="ecLand")
 
         ax[1].fill_between(doy_vector, 
                            self.scores_l2["scores_emulators_lower"], 
@@ -634,8 +634,8 @@ class VisualisationMany(VisualisationClass):
                            self.scores_l2["scores_numerical_upper"], 
                            alpha = 0.3,
                            color = "cyan")
-        ax[1].plot(doy_vector, self.scores_l2["scores_mean_emulators"], color="magenta", label="Emulator")
-        ax[1].plot(doy_vector, self.scores_l2["scores_mean_numerical"], color="cyan", label="ECLand")
+        ax[1].plot(doy_vector, self.scores_l2["scores_mean_emulators"], color="magenta", label="aiLand")
+        ax[1].plot(doy_vector, self.scores_l2["scores_mean_numerical"], color="cyan", label="ecLand")
         ax[1].legend(prop=self.legend_properties, frameon=True)
 
         ax[2].fill_between(doy_vector, 
@@ -648,8 +648,8 @@ class VisualisationMany(VisualisationClass):
                            self.scores_l3["scores_numerical_upper"], 
                            alpha = 0.3,
                            color = "cyan")
-        ax[2].plot(doy_vector, self.scores_l3["scores_mean_emulators"], color="magenta", label="Emulator")
-        ax[2].plot(doy_vector, self.scores_l3["scores_mean_numerical"], color="cyan", label="ECLand")
+        ax[2].plot(doy_vector, self.scores_l3["scores_mean_emulators"], color="magenta", label="aiLand")
+        ax[2].plot(doy_vector, self.scores_l3["scores_mean_numerical"], color="cyan", label="ecLand")
         #ax[2].legend(prop=self.legend_properties, frameon=True)
         ax[2].set_xlabel(self.xlabel, **self.label_properties)
 
@@ -695,8 +695,8 @@ class VisualisationMany(VisualisationClass):
                            threshold - self.scores_l1["scores_numerical_upper"], 
                            alpha = 0.3,
                            color = "cyan")
-        ax[0].plot(doy_vector, threshold -self.scores_l1["scores_mean_emulators"], color="magenta", label="Emulator")
-        ax[0].plot(doy_vector, threshold -self.scores_l1["scores_mean_numerical"], color="cyan", label="ECLand")
+        ax[0].plot(doy_vector, threshold -self.scores_l1["scores_mean_emulators"], color="magenta", label="aiLand")
+        ax[0].plot(doy_vector, threshold -self.scores_l1["scores_mean_numerical"], color="cyan", label="ecLand")
 
         ax[1].fill_between(doy_vector, 
                            threshold - self.scores_l2["scores_emulators_lower"], 
@@ -708,8 +708,8 @@ class VisualisationMany(VisualisationClass):
                            threshold - self.scores_l2["scores_numerical_upper"], 
                            alpha = 0.3,
                            color = "cyan")
-        ax[1].plot(doy_vector, threshold -self.scores_l2["scores_mean_emulators"], color="magenta", label="Emulator")
-        ax[1].plot(doy_vector, threshold -self.scores_l2["scores_mean_numerical"], color="cyan", label="ECLand")
+        ax[1].plot(doy_vector, threshold -self.scores_l2["scores_mean_emulators"], color="magenta", label="aiLand")
+        ax[1].plot(doy_vector, threshold -self.scores_l2["scores_mean_numerical"], color="cyan", label="ecLand")
         ax[1].legend(prop=self.legend_properties, frameon=True)
 
         ax[2].fill_between(doy_vector, 
@@ -722,8 +722,8 @@ class VisualisationMany(VisualisationClass):
                            threshold - self.scores_l3["scores_numerical_upper"], 
                            alpha = 0.3,
                            color = "cyan")
-        ax[2].plot(doy_vector, threshold - self.scores_l3["scores_mean_emulators"], color="magenta", label="Emulator")
-        ax[2].plot(doy_vector, threshold - self.scores_l3["scores_mean_numerical"], color="cyan", label="ECLand")
+        ax[2].plot(doy_vector, threshold - self.scores_l3["scores_mean_emulators"], color="magenta", label="aiLand")
+        ax[2].plot(doy_vector, threshold - self.scores_l3["scores_mean_numerical"], color="cyan", label="ecLand")
         #ax[2].legend(prop=self.legend_properties, frameon=True)
         ax[2].set_xlabel(self.xlabel, **self.label_properties)
 

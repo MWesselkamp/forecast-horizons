@@ -1,5 +1,6 @@
 """
 Script contains a class for forecasting with each emulator type.
+Author: @mariekewesselkamp
 """
 import numpy as np
 import os
@@ -200,7 +201,6 @@ class ForecastModuleMLP(ForecastModule):
                 # Perturn only on step after intitialisation
                 prediction = self._perturb_prediction(prediction) if time_idx == 1 else prediction
                 self.y_prog_prediction[time_idx+1, ...] = prediction
-
 
 class ForecastModuleLSTM(ForecastModule):
 

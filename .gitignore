@@ -9,6 +9,8 @@ ecland-emulator/lstm
 ecland-emulator/mlp
 ecland-emulator/xgb
 ecland-emulator/analyses
+ecland-emulator/data
+ecland-emulator/env_snapshot.txt
 
 c_ricker/unused
 c_ricker/plots
