@@ -48,16 +48,17 @@ if __name__ == "__main__":
     Station = ObservationModule(network = EX_CONFIG['network'], 
                                     station = EX_STATION ,
                                     variable = VARIABLE,
-                                    depth=EX_CONFIG['depth']) # Initialise the Observation Module with the default Station (Gevenich)
+                                    depth=EX_CONFIG['depth'],
+                                    years = EX_CONFIG['years']) # Initialise the Observation Module with the default Station (Gevenich)
         
 
-    Station.load_station(years = EX_CONFIG['years']) # Load two years of station data for lookback slicing
+    Station.load_station() # Load two years of station data for lookback slicing
     Station.load_forcing() # Load forcing for matching data base with station data
-    closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
+    Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
     Station.process_station_data() # specify path_to_plots, if you want to visualise
-    station_data = Station.slice_station_data(lookback=0,t_0=EX_CONFIG['initial_time'])
+    Station.slice_station_data(lookback=0,t_0=EX_CONFIG['initial_time'])
 
-    DOY_VECTOR = Station.doy_vector
+    DOY_VECTOR = Station.doy_vector[:MAXIMUM_LEADTIME]
 
     #use_stations = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
     #                'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 

@@ -29,7 +29,7 @@ EX_CONFIG = load_config(config_path = 'configs/tereno_sm.yaml')
 
 network =  EX_CONFIG['network'] #'soil_TERENO_ISMN_2022.nc'#'soil_SMOSMANIA_ISMN_2022.nc' # 'soil_TERENO_ISMN_2022.nc'
 network_name = network.split('_')[1]
-station = EX_CONFIG['station'] # 'Lahas'
+STATION = EX_CONFIG['station'] # 'Lahas'
 
 variable = EX_CONFIG['variable'] 
 depth = EX_CONFIG['depth']  # [0.05, 0.2, 0.3]
@@ -63,11 +63,12 @@ if __name__ == "__main__":
     Station = ObservationModule(network = network, 
                                 station = station,
                                 variable = variable,
-                                depth=depth) # Initialise the Observation Module with the default Station (Gevenich)
+                                depth=depth,
+                                years = years) # Initialise the Observation Module with the default Station (Gevenich)
 
-    Station.load_station(years = years) # Load two years of station data for lookback slicing
+    Station.load_station() # Load two years of station data for lookback slicing
     Station.load_forcing() # Load forcing for matching data base with station data
-    closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
+    Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
     Station.process_station_data() # specify path_to_plots, if you want to visualise
 
     dynamic_features_ensemble = {}
@@ -79,26 +80,30 @@ if __name__ == "__main__":
             print('mlp')
             CONFIG = load_config(config_path = 'configs/mlp_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
-            ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG)    
+            ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG,
+                                              closest_grid_cell= Station.closest_indices_dict[STATION])    
         elif mod == 'lstm':
             CONFIG = load_config(config_path = 'configs/lstm_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/lstm')
-            ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG)
+            ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG,
+                                              closest_grid_cell= Station.closest_indices_dict[STATION])
         elif mod == 'xgb':
             CONFIG = load_config(config_path = 'configs/xgb_emulator_node.yaml')
             HPARS = None
-            ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG)
+            ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG,
+                                              closest_grid_cell= Station.closest_indices_dict[STATION])
 
-        CONFIG['x_slice_indices'] = closest_grid_cell # adjust the index of the grid cell in the config file before initialising the models
 
         dataset = ForecastModel.initialise_dataset(EX_CONFIG['initial_time'])
         model = ForecastModel.load_model()
         x_static, x_met, y_prog, y_prog_initial_state = ForecastModel.load_test_data(dataset)  
         print("INITIAL STATE SHAPE:", y_prog_initial_state.shape)
 
-        station_data = Station.slice_station_data(lookback=CONFIG["lookback"],
+        Station.slice_station_data(lookback=CONFIG["lookback"],
                                         t_0=EX_CONFIG['initial_time'])
-        matching_indices = Station.match_indices(dataset=dataset,
+        station_data = Station.select_station_data(STATION)
+
+        matching_indices = ForecastModel.match_indices(dataset=dataset,
                                                 target_variables=EX_CONFIG['targets_eval'])
         y_prog_initial_state[..., matching_indices] = station_data[:y_prog_initial_state.shape[0]]
         
@@ -106,9 +111,9 @@ if __name__ == "__main__":
 
         ensemble_prediction = []
         for i in range(len(perturbed_ensemble)):
-            matching_indices = Station.match_indices(dataset=dataset,
+            matching_indices = ForecastModel.match_indices(dataset=dataset,
                                                 target_variables=EX_CONFIG['targets_prog'])
-            initial_vector =  Station.transform_station_data(station_data = perturbed_ensemble[i],
+            initial_vector =  ForecastModel.transform_station_data(station_data = perturbed_ensemble[i],
                                                     target_variable_list = EX_CONFIG['targets_prog'])
 
             dynamic_features, dynamic_features_prediction = ForecastModel.run_forecast(initial_conditions=initial_vector, 

@@ -13,17 +13,25 @@ SCRIPT_DIR = os.getcwd()
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR) 
 
-Station = ObservationModule(network = 'soil_SMOSMANIA_ISMN_2022.nc', 
-                                    station = 'Condom' ,
+station_ids = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
+                    'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
+                    'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais',
+                    'Mazan-Abbaye', 'LezignanCorbieres']
+
+Stations = ObservationModule(network = 'soil_SMOSMANIA_ISMN_2022.nc', 
+                                    station = station_ids ,
                                     variable = 'st',
-                                    depth=[0.05, 0.2, 0.3]) # Initialise the Observation Module with the default Station (Gevenich)
+                                    depth=[0.05, 0.2, 0.3],
+                                    years = [2021, 2022]) # Initialise the Observation Module with the default Station (Gevenich)
         
 
-Station.load_station(years = [2021, 2022]) # Load two years of station data for lookback slicing
-Station.load_forcing() # Load forcing for matching data base with station data
-closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
+Stations.load_station() # Load two years of station data for lookback slicing
+Stations.load_forcing() # Load forcing for matching data base with station data
+closest_grid_cell = Stations.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
 
 #soil_type = Station.station_physiography()
-Station.process_station_data()
+Stations.process_station_data()
 
+print(Stations.closest_indices_dict["Condom"])
 print("Finished.")
+

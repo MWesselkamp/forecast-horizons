@@ -16,23 +16,24 @@ class ObservationModule:
                  network = 'soil_TERENO_ISMN_2022.nc', 
                  station = None, 
                  variable = 'st', 
-                 depth = None):
+                 depth = None,
+                 years = None,):
         
         self.network = network
         self.station = station
         self.variable = variable
         self.depth = depth
+        self.years = years
 
         self.network_name = self.network.split('_')[1]
 
         self._process_variable = self._process_temperature if variable == 'st' else self._process_soilmoisture
 
     def load_station(self, 
-                     years = None,
                      data_path = '/perm/dadf/HSAF_validation/in_situ_data/pre_processed_data/ismn_nc'):
-        self.years = years
+        
         self.data_path = data_path
-        if (years is None) | (len(years) == 1):
+        if (self.years is None) | (len(self.years) == 1):
             self._load_single_year()
         else:
             self._load_multiple_years()
@@ -40,6 +41,7 @@ class ObservationModule:
     def _load_single_year(self):
         
         self.network_data = xr.open_dataset(os.path.join(self.data_path,self.network))
+
         if self.station is not None:
             print("Select station: ", self.station)
             self.network_data = self.network_data.sel(station_id = [self.station])
@@ -56,7 +58,7 @@ class ObservationModule:
 
         if self.station is not None:
             print("Select station: ", self.station)
-            self.network_data = self.network_data.sel(station_id = [self.station])
+            self.network_data = self.network_data.sel(station_id = self.station)
         if self.depth is not None:
             print("Select depth: ", self.depth)
             self.network_data = self.network_data.sel(depth = self.depth)
@@ -107,7 +109,35 @@ class ObservationModule:
             
             closest_indices.append(closest_idx)
 
-        self.closest_gridcell = self.forcing.isel(x=closest_indices)  # select the closest grid cell to station 
+        #self.closest_gridcell = self.forcing.isel(x=closest_indices)  # select the closest grid cell to station 
+        print("Matched station with grid cell: ", closest_indices)
+        self.closest_indices_dict = dict(zip(self.network_data.station_id.values, closest_indices))
+
+        return closest_indices
+    
+    def match_station_with_ecland_climatology(self, 
+                                              file_path = "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"):
+
+        climatology = xr.open_dataset(file_path)
+
+        lat_a = self.network_data.lat.values  
+        lat_b = self.forcing.lat.values 
+        lon_a = self.network_data.lon.values  
+        lon_b = self.forcing.lon.values 
+
+        closest_indices = []
+        for lat, lon in zip(lat_a, lon_a):
+            
+            distances = np.sqrt((lat_b - lat)**2 + (lon_b - lon)**2) #Euclidean distance
+            closest_idx = distances.argmin() # closest distance
+            
+            closest_indices.append(closest_idx)
+
+        self.closest_gridcell = climatology.isel(x=closest_indices) # select the closest grid cell to station 
+        #climatology_sel = climatology.isel(doy=slice(31*4, None))
+        #climatology_mu = climatology_sel['clim_6hr_mu'].sel(variable=["stl1", "stl2", "stl3"]).values.T
+        #climatology_std = climatology_sel['clim_6hr_std'].sel(variable=["stl1", "stl2", "stl3"]).values.T
+
         print("Matched station with grid cell: ", closest_indices[0])
 
         return closest_indices[0]
@@ -156,7 +186,11 @@ class ObservationModule:
 
         # create a doy vector for plotting.
         self.doy_vector = self.variable_data_slice['time'].values
-        variable_data_tensor = torch.tensor(self.variable_data_slice.values, dtype=torch.float32)
+
+    def select_station_data(self, station_id):
+
+        self.variable_data_station = self.variable_data_slice.sel(station_id = station_id)
+        variable_data_tensor = torch.tensor(self.variable_data_station.values, dtype=torch.float32)
         
         return variable_data_tensor
     
@@ -165,32 +199,8 @@ class ObservationModule:
         self.variable_data.plot()
         plt.savefig(os.path.join(save_to, f'{self.network_name}_{self.station}_image_plot.pdf'))
         plt.show()
-
-    def match_indices(self, dataset, target_variables):
-        self.dataset = dataset
-        matching_indices = [i for i, val in enumerate(self.dataset.targ_lst) if val in target_variables]
-        return matching_indices
     
-    def transform_initial_vector(self, station_data, matching_indices):
-
-        y_prog_means = self.dataset.y_prog_means[matching_indices]
-        y_prog_stds = self.dataset.y_prog_stdevs[matching_indices]
-
-        variable_data = self.dataset.prog_transform(station_data, 
-                                                means=y_prog_means, 
-                                                stds=y_prog_stds)
-        
-        return variable_data
     
-    def transform_station_data(self, station_data, target_variable_list):
-
-        y_prog_means, y_prog_stds, _ = self.dataset.get_prognostic_standardiser(target_variable_list)
-
-        variable_data = self.dataset.prog_transform(station_data, 
-                                                means=y_prog_means, 
-                                                stds=y_prog_stds)
-        
-        return variable_data
 
 
 

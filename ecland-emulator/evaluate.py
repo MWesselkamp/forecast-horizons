@@ -207,12 +207,13 @@ if __name__ == "__main__":
     Station = ObservationModule(network = EX_CONFIG['network'], 
                                 station = STATION ,
                                 variable = VARIABLE,
-                                depth=EX_CONFIG['depth']) # Initialise the Observation Module with the default Station (Gevenich)
+                                depth=EX_CONFIG['depth'],
+                                years = EX_CONFIG['years']) # Initialise the Observation Module with the default Station (Gevenich)
     
 
-    Station.load_station(years = EX_CONFIG['years']) # Load two years of station data for lookback slicing
+    Station.load_station() # Load two years of station data for lookback slicing
     Station.load_forcing() # Load forcing for matching data base with station data
-    closest_grid_cell = Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
+    Station.match_station_with_forcing() # Match the station with clostest grid cell and extract the index of the grid cell
     soil_type = Station.station_physiography()
     Station.process_station_data(PATH_TO_PLOTS) # specify path_to_plots, if you want to visualise
 
@@ -227,33 +228,32 @@ if __name__ == "__main__":
             print('mlp')
             CONFIG = load_config(config_path = 'configs/mlp_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
-            ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG)    
+            ForecastModel = ForecastModuleMLP(hpars=HPARS, config=CONFIG,
+                                              closest_grid_cell= Station.closest_indices_dict[STATION])    
         elif mod == 'lstm':
             CONFIG = load_config(config_path = 'configs/lstm_emulator_node.yaml')
             HPARS = load_hpars(use_model = 'ecland-emulator/lstm')
-            ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG)
+            ForecastModel = ForecastModuleLSTM(hpars=HPARS, config=CONFIG,
+                                              closest_grid_cell= Station.closest_indices_dict[STATION])
         elif mod == 'xgb':
             CONFIG = load_config(config_path = 'configs/xgb_emulator_node.yaml')
             HPARS = None
-            ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG)
+            ForecastModel = ForecastModuleXGB(hpars=HPARS, config=CONFIG,
+                                              closest_grid_cell= Station.closest_indices_dict[STATION])
 
-        CONFIG['x_slice_indices'] = closest_grid_cell # adjust the index of the grid cell in the config file before initialising the models
-
-        dataset = ForecastModel.initialise_dataset(INITIAL_TIME)
+        Station.slice_station_data(lookback=CONFIG["lookback"], t_0=INITIAL_TIME)
+        ForecastModel.initialise_dataset(INITIAL_TIME)
         model = ForecastModel.load_model()
-        x_static, x_met, y_prog, y_prog_initial_state = ForecastModel.load_test_data(dataset)  
+        x_static, x_met, y_prog, y_prog_initial_state = ForecastModel.load_test_data()  
 
-        station_data = Station.slice_station_data(lookback=CONFIG["lookback"],
-                                    t_0=INITIAL_TIME)
-        matching_indices = Station.match_indices(dataset=dataset,
-                                                target_variables=EX_CONFIG['targets_eval'])
+        matching_indices = ForecastModel.match_indices(target_variables=EX_CONFIG['targets_eval'])
 
+        station_data = Station.select_station_data(STATION)
         y_prog_initial_state[..., matching_indices] = station_data[:y_prog_initial_state.shape[0]]
         
-        matching_indices = Station.match_indices(dataset=dataset,
-                                                target_variables=EX_CONFIG['targets_prog'])
+        matching_indices = ForecastModel.match_indices(target_variables=EX_CONFIG['targets_prog'])
         print("MATCHING INDICES: ", matching_indices)
-        initial_vector =  Station.transform_station_data(station_data = y_prog_initial_state, 
+        initial_vector =  ForecastModel.transform_station_data(station_data = y_prog_initial_state, 
                                                     target_variable_list = EX_CONFIG['targets_prog'])
 
         dynamic_features, dynamic_features_prediction = ForecastModel.run_forecast(initial_conditions=initial_vector)
@@ -265,8 +265,7 @@ if __name__ == "__main__":
     fc_numerical = dynamic_features_dict['mlp']
     fc_emulators = dynamic_features_prediction_dict
 
-    matching_indices = Station.match_indices(dataset=dataset,
-                                                target_variables=EX_CONFIG['targets_eval'])
+    matching_indices = ForecastModel.match_indices(target_variables=EX_CONFIG['targets_eval'])
     
     forecast_ensemble = assemble_forecasts(observations=station_data,
                     fc_numerical=fc_numerical,

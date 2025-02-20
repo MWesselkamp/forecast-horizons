@@ -29,10 +29,11 @@ class ForecastModule(ABC):
     Initialize class with Pytorch lighning or DLMC xgb model type.
     """
     
-    def __init__(self, hpars ,config, my_device = None):
+    def __init__(self, hpars ,config, closest_grid_cell, my_device = None):
         
         self.hpars = hpars
         self.config = config
+        self.config['x_slice_indices'] = closest_grid_cell
 
         if my_device is None:
             self.my_device = DEVICE
@@ -56,6 +57,32 @@ class ForecastModule(ABC):
         self._set_forcing_device()
 
         return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state
+    
+    def match_indices(self, target_variables):
+        matching_indices = [i for i, val in enumerate(self.dataset.targ_lst) if val in target_variables]
+        return matching_indices
+    
+
+    def transform_initial_vector(self, station_data, matching_indices):
+
+        y_prog_means = self.dataset.y_prog_means[matching_indices]
+        y_prog_stds = self.dataset.y_prog_stdevs[matching_indices]
+
+        variable_data = self.dataset.prog_transform(station_data, 
+                                                means=y_prog_means, 
+                                                stds=y_prog_stds)
+        
+        return variable_data
+    
+    def transform_station_data(self, station_data, target_variable_list):
+
+        y_prog_means, y_prog_stds, _ = self.dataset.get_prognostic_standardiser(target_variable_list)
+
+        variable_data = self.dataset.prog_transform(station_data, 
+                                                means=y_prog_means, 
+                                                stds=y_prog_stds)
+        
+        return variable_data
         
     def _set_initial_conditions(self, initial_conditions):
 
@@ -143,18 +170,16 @@ class ForecastModuleMLP(ForecastModule):
 
     def initialise_dataset(self, initial_time):
 
-        dataset = EcDatasetMLP(self.config,
+        self.dataset = EcDatasetMLP(self.config,
                     self.config["test_start"],
                     self.config["test_end"],
                     initial_time)
 
-        self.input_clim_dim = len(dataset.static_feat_lst)
-        self.input_met_dim = len(dataset.dynamic_feat_lst)
-        self.input_state_dim = len(dataset.targ_lst)
-        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.input_clim_dim = len(self.dataset.static_feat_lst)
+        self.input_met_dim = len(self.dataset.dynamic_feat_lst)
+        self.input_state_dim = len(self.dataset.targ_lst)
+        self.output_dim = len(self.dataset.targ_lst)  # Number of output targets
         self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
-
-        return dataset
     
     def load_model(self):
 
@@ -206,18 +231,16 @@ class ForecastModuleLSTM(ForecastModule):
 
     def initialise_dataset(self, initial_time):
 
-        dataset = EcDatasetLSTM(self.config,
+        self.dataset = EcDatasetLSTM(self.config,
                     self.config["test_start"],
                     self.config["test_end"],
                     initial_time)
 
-        self.input_clim_dim = len(dataset.static_feat_lst)
-        self.input_met_dim = len(dataset.dynamic_feat_lst)
-        self.input_state_dim = len(dataset.targ_lst)
-        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.input_clim_dim = len(self.dataset.static_feat_lst)
+        self.input_met_dim = len(self.dataset.dynamic_feat_lst)
+        self.input_state_dim = len(self.dataset.targ_lst)
+        self.output_dim = len(self.dataset.targ_lst)  # Number of output targets
         self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
-
-        return dataset
     
     def _process_data(self):
         return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state 
@@ -299,18 +322,16 @@ class ForecastModuleXGB(ForecastModule):
 
     def initialise_dataset(self, initial_time):
 
-        dataset = EcDatasetXGB(self.config,
+        self.dataset = EcDatasetXGB(self.config,
                     self.config["test_start"],
                     self.config["test_end"],
                     initial_time)
 
-        self.input_clim_dim = len(dataset.static_feat_lst)
-        self.input_met_dim = len(dataset.dynamic_feat_lst)
-        self.input_state_dim = len(dataset.targ_lst)
-        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.input_clim_dim = len(self.dataset.static_feat_lst)
+        self.input_met_dim = len(self.dataset.dynamic_feat_lst)
+        self.input_state_dim = len(self.dataset.targ_lst)
+        self.output_dim = len(self.dataset.targ_lst)  # Number of output targets
         self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
-
-        return dataset
 
     def load_model(self):
 

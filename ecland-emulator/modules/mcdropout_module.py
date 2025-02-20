@@ -40,28 +40,50 @@ class MCdropoutForecastModule(ABC):
         else:
             self.my_device = my_device
 
-    def load_test_data(self, dataset):
+    def load_test_data(self):
         
-        self.dataset = dataset
         self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state = self.dataset.load_data() 
         self._set_forcing_device()
 
         return self.x_static, self.x_met, self.y_prog, self.y_prog_initial_state
     
+    def match_indices(self, target_variables):
+        matching_indices = [i for i, val in enumerate(self.dataset.targ_lst) if val in target_variables]
+        return matching_indices
+    
     def initialise_dataset(self, initial_time):
 
-        dataset = EcDatasetMLP(self.config,
+        self.dataset = EcDatasetMLP(self.config,
                     self.config["test_start"],
                     self.config["test_end"],
                     initial_time)
 
-        self.input_clim_dim = len(dataset.static_feat_lst)
-        self.input_met_dim = len(dataset.dynamic_feat_lst)
-        self.input_state_dim = len(dataset.targ_lst)
-        self.output_dim = len(dataset.targ_lst)  # Number of output targets
+        self.input_clim_dim = len(self.dataset.static_feat_lst)
+        self.input_met_dim = len(self.dataset.dynamic_feat_lst)
+        self.input_state_dim = len(self.dataset.targ_lst)
+        self.output_dim = len(self.dataset.targ_lst)  # Number of output targets
         self.output_diag_dim = 0 # len(dataset.targ_diag_lst)
 
-        return dataset
+    def transform_initial_vector(self, station_data, matching_indices):
+
+        y_prog_means = self.dataset.y_prog_means[matching_indices]
+        y_prog_stds = self.dataset.y_prog_stdevs[matching_indices]
+
+        variable_data = self.dataset.prog_transform(station_data, 
+                                                means=y_prog_means, 
+                                                stds=y_prog_stds)
+        
+        return variable_data
+    
+    def transform_station_data(self, station_data, target_variable_list):
+
+        y_prog_means, y_prog_stds, _ = self.dataset.get_prognostic_standardiser(target_variable_list)
+
+        variable_data = self.dataset.prog_transform(station_data, 
+                                                means=y_prog_means, 
+                                                stds=y_prog_stds)
+        
+        return variable_data
     
     def load_model(self):
 
