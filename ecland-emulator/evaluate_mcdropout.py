@@ -7,6 +7,7 @@ import argparse
 from scores.probability import crps_cdf
 import xarray as xr
 import scipy
+import pandas as pd
 from joblib import Parallel, delayed
 
 parent_dir = os.path.abspath('..')
@@ -54,17 +55,6 @@ def run_analysis(station_id):
     #soil_type = Station.station_physiography()
     Station.process_station_data()
 
-    # Load ecLand climatology
-    #file_path = "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"
-    #climatology = xr.open_dataset(file_path)
-    #climatology_sel = climatology.isel(x=closest_grid_cell)
-    #climatology_sel = climatology.isel(doy=slice(31*4, None))
-    #climatology_mu = climatology_sel['clim_6hr_mu'].sel(variable=["stl1", "stl2", "stl3"]).values.T
-    #climatology_std = climatology_sel['clim_6hr_std'].sel(variable=["stl1", "stl2", "stl3"]).values.T
-    #print(climatology_mu.shape)
-    #print(climatology_std.shape)
-
-
     ForecastModel = MCdropoutForecastModule(hpars=HPARS, config=CONFIG, closest_grid_cell = closest_grid_cell) 
 
     dataset = ForecastModel.initialise_dataset(INITIAL_TIME)
@@ -105,7 +95,6 @@ def run_analysis(station_id):
     clim_mean = clim_mean[:,:HORIZON]
     clim_std = clim_std[:,:HORIZON]
     doy = Station.doy_vector[:HORIZON].T
-    globals()['DOY'] = doy
 
     fig, ax = plt.subplots(1,3,figsize = (12,4), sharey=False, sharex=True, constrained_layout = True)
     for layer in range(3):
@@ -174,7 +163,7 @@ def run_analysis(station_id):
     # plt.savefig(f'ecland-emulator/plots/mc_ensemble_exeedanceprob_{station_id}.pdf')
     # plt.show()
 
-    return crpss
+    return [crpss, doy]
 
 station_ids = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
                     'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
@@ -183,11 +172,13 @@ station_ids = ['Condom', 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
 
 results = Parallel(n_jobs=-1)(delayed(run_analysis)(sid) for sid in station_ids)
 
-print(type(results))  # Should be a list
-print(type(results[0]))  # Should be a numpy.ndarray
-print(results[0].shape)  # Shape of one result array
 
-data_np = np.stack(results)
+start_time = pd.Timestamp('2022-02-01T00:00:00')
+time_steps = pd.date_range(start=start_time, periods=10, freq='6H')  # Adjust periods as needed
+print(time_steps)
+
+doy = results[0][1]
+data_np = np.stack([output[0] for output in results])
 
 print(data_np.shape)
 
@@ -197,7 +188,7 @@ for layer in range(3):
         station_std = np.nanstd(data_np[...,layer].squeeze().T, axis=1)
         ax[layer].hlines(y = 0, xmin=0, xmax=HORIZON, linestyles="--", color="black")
         ax[layer].fill_between(np.arange(HORIZON), station_mean+station_std, station_mean-station_std, color="lightblue", alpha = 0.7, linewidth = 0.9, label="Station spread")
-        ax[layer].plot(DOY, station_mean, color="blue", alpha = 0.99, label = "Station mean")
+        ax[layer].plot(doy, station_mean, color="blue", alpha = 0.99, label = "Station mean")
         #ax[0].plot(dynamic_features[...,3].squeeze(), color = "cyan")
         ax[layer].set_ylabel("CRPSS")
         ax[layer].set_xlabel("Lead time")
