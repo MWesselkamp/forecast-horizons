@@ -123,7 +123,7 @@ class MCdropoutForecastModule(ABC):
     def _perturb_prediction(self, original_vector):
 
         if self.predictions_perturbation is not None:
-            return torch.normal(mean=original_vector, std=0.1*abs(original_vector))
+            return torch.normal(mean=original_vector, std=0.05*abs(original_vector))
         else:
             return original_vector
 
@@ -189,6 +189,7 @@ class MCdropoutForecastModule(ABC):
         mc_trajectories = torch.zeros((mc_samples, self.y_prog_prediction.shape[0], *self.y_prog_prediction.shape[1:]))
         
         with torch.no_grad():
+            
             for sample_idx in range(mc_samples):  # Iterate over MC samples
 
                 y_temp = self.y_prog_prediction.clone()  # Copy initial conditions
