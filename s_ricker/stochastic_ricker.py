@@ -265,7 +265,7 @@ def plot_leadtime_distribution():
     ax.plot(daily_mean, color = "blue", label = "Mean")
     ax.set_ylabel("CRPSS")
     ax.set_xlabel("Forecast horizon")
-    ax.set_ylim((-1,1))
+    #ax.set_ylim((-1,1))
     ax.legend()
 
 def plot_forecast_limit_hist():
