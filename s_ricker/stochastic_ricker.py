@@ -264,7 +264,7 @@ def plot_leadtime_distribution():
     ax.fill_between(np.arange(horiz), daily_mean + daily_std, daily_mean - daily_std, alpha = 0.6, color = "lightblue", label = "Spread")
     ax.plot(daily_mean, color = "blue", label = "Mean")
     ax.set_ylabel("CRPSS")
-    ax.set_xlabel("Forecast horizon")
+    ax.set_xlabel("Lead time")
     #ax.set_ylim((-1,1))
     ax.legend()
 
