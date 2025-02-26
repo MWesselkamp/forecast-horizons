@@ -153,7 +153,6 @@ def run_analysis(station_id, Station):
 
         ax[0, layer].set_ylabel(ylabel)
         ax[0, layer].tick_params(axis='x', rotation=45)
-        ax[0, layer].legend(loc="upper right")
 
     # ---- Second Row (CRPSS) ----
     for layer in range(3):
@@ -167,6 +166,12 @@ def run_analysis(station_id, Station):
         ax[1, layer].tick_params(axis='x', rotation=45)
         ax[1, layer].xaxis.set_major_locator(mdates.AutoDateLocator())
         ax[1, layer].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+    handles, labels = ax[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 0.99))
+
+    # Ensure layout accommodates the legend
+    plt.tight_layout(rect=[0, 0, 1, 0.93])  # Leaves space at top for legend
 
 
     plt.savefig(f'ecland-emulator/plots/mc_ensemble_combined_{VARIABLE}_{station_id}.pdf')

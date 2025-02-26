@@ -6,6 +6,7 @@ import os
 import sys 
 import torch
 import re
+import copy
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -199,6 +200,9 @@ class ObservationModule:
         self.variable_data.plot()
         plt.savefig(os.path.join(save_to, f'{self.network_name}_{self.station}_image_plot.pdf'))
         plt.show()
+
+    def get_class_copy(self):
+        return copy.deepcopy(self)
     
     
 

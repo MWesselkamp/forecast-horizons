@@ -26,27 +26,28 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR) 
 
 INITIAL_TIME = '2022-02-01T00:00:00'
-VARIABLE = 'st'
+VARIABLE = 'sm'
 
 if VARIABLE == 'st':
     VAR_ID = 3
     TARG_VARS = [ "stl1", "stl2", "stl3"]
     CONFIG = load_config(config_path = 'configs/mlp_emulator_node_st.yaml')
-    station_ids = ['Condom' , 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
-               'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
-                'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais',
-               'Mazan-Abbaye', 'LezignanCorbieres']
+    station_ids = ['Condom' ] #, 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
+             #  'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
+             #   'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais',
+             #  'Mazan-Abbaye', 'LezignanCorbieres']
+    HORIZON = 52 # two weeks horizon
 else:
-     VAR_ID = 0
-     TARG_VARS = [ "swvl1", "swvl2", "swvl3"]
-     CONFIG = load_config(config_path = 'configs/mlp_emulator_node_sm.yaml')
-     station_ids = ['Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
-                        'LaGrandCombe', 'CreondArmagnac', 'Urgons', 'Condom']
+    VAR_ID = 0
+    TARG_VARS = [ "swvl1", "swvl2", "swvl3"]
+    CONFIG = load_config(config_path = 'configs/mlp_emulator_node_sm.yaml')
+    station_ids = [ 'Condom'] # 'Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
+                     #   'LaGrandCombe', 'CreondArmagnac', 'Urgons',
+    HORIZON = 52*4 # two weeks horizon
      
 TARG_LST = [ "swvl1", "swvl2", "swvl3", "stl1", "stl2", "stl3", "snowc"]
 MC_SAMPLES = 1000
-HORIZON = 52 # two weeks horizon
-INITIAL_TIMES = 50
+INITIAL_TIMES = 150
 
 HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
 
@@ -80,7 +81,9 @@ def run_analysis(station_id, Station, time_step):
     clim_std = clim_std[:,:HORIZON]
 
     crps_fc = np.empty((HORIZON,3))
+    crps_fc[:]  = np.nan
     crps_clim = np.empty((HORIZON,3))
+    crps_clim[:]  = np.nan
 
     # Vectorized sampling for climatological distribution
     climatological_distr = np.random.normal(
@@ -97,7 +100,7 @@ def run_analysis(station_id, Station, time_step):
 
             obs = station_data[...,layer].squeeze()[t]
 
-            if np.isnan(obs):  
+            if np.isnan(np.asarray(obs)).any():  
                 continue # Skip CRPS computation for this time step if obs is missing
 
             # Precomputed climatological distribution for this layer and time step
@@ -146,14 +149,12 @@ time_steps = pd.date_range(start=start_time, periods=INITIAL_TIMES, freq='6H')  
 TIME_STRINGS = time_steps.strftime('%Y-%m-%d %H:%M:%S').tolist()
 
 def process_station(t):
-    Station.slice_station_data(lookback=0, t_0=TIME_STRINGS[t])
-    results = Parallel(n_jobs=5, backend="loky")(
-        delayed(run_analysis)(sid, Station, t) for sid in station_ids
-    )
+    station_t = Station.get_class_copy()
+    station_t.slice_station_data(lookback=0, t_0=TIME_STRINGS[t])
+    results = run_analysis("Condom", station_t, t) 
     return results
 
-with parallel_backend("loky", inner_max_num_threads=2):
-    final_results = Parallel(n_jobs=4, backend="loky")(delayed(process_station)(t) for t in range(len(TIME_STRINGS)))
+final_results = Parallel(n_jobs=8, backend="loky")(delayed(process_station)(t) for t in range(len(TIME_STRINGS)))
 
 # Flatten the nested list if needed
 final_results = np.array(final_results)
@@ -162,12 +163,12 @@ final_results = np.array(final_results)
 
 xr_data = xr.DataArray(
     final_results,
-    dims=["t_init", "station", "lead_time", "var"],
-    coords={"t_init": TIME_STRINGS, "station": station_ids, "lead_time": np.arange(HORIZON), "var": TARG_VARS},
+    dims=["t_init", "lead_time", "var"], #"station",
+    coords={"t_init": TIME_STRINGS, "lead_time": np.arange(HORIZON), "var": TARG_VARS}, # "station": station_ids,
     name="forecast_horizons"
 )
 
-xr_data.to_netcdf("ecland-emulator/results/forecast_horizons.nc")
+xr_data.to_netcdf(f"ecland-emulator/results/forecast_horizons_{VARIABLE}.nc")
 
 print("--- %s seconds ---" % (time.time() - start))
 
