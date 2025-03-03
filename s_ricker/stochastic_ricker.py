@@ -264,7 +264,7 @@ def plot_leadtime_distribution():
     ax.fill_between(np.arange(horiz), daily_mean + daily_std, daily_mean - daily_std, alpha = 0.6, color = "lightblue", label = "Spread")
     ax.plot(daily_mean, color = "blue", label = "Mean")
     ax.set_ylabel("CRPSS")
-    ax.set_xlabel("Lead time")
+    ax.set_xlabel("Forecast horizon")
     #ax.set_ylim((-1,1))
     ax.legend()
 
@@ -311,7 +311,7 @@ IC_error = 0.0001 # assumed initial conditions error
 # simulate observations with observation error and stochastic parameters
 dat_train = observations(r = r, k=k, N_init = N_init, sigma_N = sigma_N, 
                           error_size = parameter_error, tsteps = clim_horiz) 
-# plot_observations(dat_train)
+plot_observations(dat_train)
 y_obs = dat_train['dyn_proc'][-horiz_obs:]
 
 N_init = y_obs[0] # initial conditions for climatological forecast
@@ -362,6 +362,9 @@ fig, ax = plt.subplots(1, 1, figsize = (5, 4), constrained_layout=True)
 plot_crps_single()
 plt.savefig("s_ricker/plots/crps.pdf")
 plt.show()
+
+
+print("Forecast limit: ", np.argmax(crpss < 0))
 
 # Explore ensemble statistics
 # Spread-error (Also possible: Spread-skill)
@@ -460,7 +463,26 @@ print(forecast_limits)
 
 forecast_limits_clean = forecast_limits[~np.isnan(forecast_limits)]
 forecast_limit_average = np.mean(forecast_limits_clean)
+forecast_limit_median = np.quantile(forecast_limits_clean, q = 0.5)
+forecast_limit_qupper = np.quantile(forecast_limits_clean, q = 0.75)
+forecast_limit_qlower = np.quantile(forecast_limits_clean, q = 0.25)
 average_forecast_limit = np.argmax(daily_mean < 0)
+median_forecast_limit = np.argmax(daily_median < 0)
+qupper_forecast_limit = np.argmax(daily_qupper < 0)
+qlower_forecast_limit = np.argmax(daily_qlower < 0)
+
+print("Forecast limit mean: ", forecast_limit_average)
+print("Forecast limit std: ", np.std(forecast_limits_clean))
+print("Forecast limit median: ", forecast_limit_median)
+print("Forecast limit qupper: ", forecast_limit_qupper)
+print("Forecast limit qlower: ", forecast_limit_qlower)
+print("Mean forecast limit: ", average_forecast_limit)
+print("Median forecast limit: ", median_forecast_limit)
+print("Qupper forecast limit: ", qupper_forecast_limit)
+print("Qlower forecast limit: ", qlower_forecast_limit)
+print("STD forecast limit: ", np.argmax(daily_std < 0))
+print("STD -  forecast limit: ", np.argmax(daily_mean - daily_std < 0))
+print("STD +  forecast limit: ", np.argmax(daily_mean + daily_std < 0))
 
 # Plot the CRPS over all days at different forecast horizons
 fig, ax = plt.subplots(1, 1, figsize = (5,4), constrained_layout = True)
