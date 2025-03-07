@@ -7,7 +7,7 @@ import seaborn as sns
 import tol_colors as tc
 import os
 
-from iLand.data import *
+from data import *
 from matplotlib import font_manager
 from metrics import absolute_differences
 
@@ -123,17 +123,17 @@ def create_site_index_boundaries_plot(measurements, predictions,
     measured_yield_class_rho2 = dm.select_measurement_site_index(measurements_df, site_index = [8,12])
     measured_yield_class_rho1 = dm.select_measurement_site_index(measurements_df, site_index = [9,11])
 
-    grouped_df = measured_yield_class_rho2.groupby('dGz100')
-    for name, group in grouped_df:
-        axs[0].plot(group['Alter'], group['Ho'], color="red", linewidth=2)
     grouped_df = measured_yield_class_rho1.groupby('dGz100')
+    #for name, group in grouped_df:
+    #    axs[0].plot(group['Alter'], group['Ho'], color="salmon", linewidth=2)
+    #grouped_df = measured_yield_class_rho1.groupby('dGz100')
+    #for name, group in grouped_df:
+    #    axs[0].plot(group['Alter'], group['Ho'], color="salmon", linewidth=2)
+    #grouped_df = measured_yield_class_rho3.groupby('dGz100')
     for name, group in grouped_df:
         axs[0].plot(group['Alter'], group['Ho'], color="salmon", linewidth=2)
-    grouped_df = measured_yield_class_rho3.groupby('dGz100')
-    for name, group in grouped_df:
-        axs[0].plot(group['Alter'], group['Ho'], color="darkred", linewidth=2)
     reference_yield_class = measurements_df.query(f"dGz100 == {site_index}")
-    axs[0].plot(reference_yield_class['Alter'], reference_yield_class['Ho'], color="black", label="Reference", linewidth=2)
+    axs[0].plot(reference_yield_class['Alter'], reference_yield_class['Ho'], color="black", label="Verification", linewidth=2)
     bias = []
     for idx in predictions_df['rid'].unique():
         predicted_yield_class = dm.select_predictions_plot(predictions_df, idx)
@@ -141,7 +141,7 @@ def create_site_index_boundaries_plot(measurements, predictions,
         bias.append(absolute_differences(predicted_yield_class_sparse['dominant_height'].values, reference_yield_class['Ho'].values))
         axs[0].plot(predicted_yield_class['age'], predicted_yield_class['dominant_height'], color="blue", linewidth=2)
 
-    axs[0].plot([], [], color="red", label="Standard")
+    axs[0].plot([], [], color="salmon", label="Reference")
     axs[0].plot([], [], color="blue", label="Forecast")
     #axs[0].axvline(x=100, color='black', linestyle='--')
     axs[0].set_ylabel('Dominant height [m]', fontsize=16, fontweight = 'bold')
@@ -154,12 +154,14 @@ def create_site_index_boundaries_plot(measurements, predictions,
 
     #axs[1].plot(predicted_yield_class_sparse['age'], ae_ex.transpose(), color="blue", linewidth=2.5)
     axs[1].plot(predicted_yield_class_sparse['age'], rho_g.transpose(), color="salmon", linewidth=2)
+    axs[1].plot(predicted_yield_class_sparse['age'], rho_g.transpose()[:,0], color="salmon", linewidth=2, label="Tolerance")
     axs[1].plot(predicted_yield_class_sparse['age'], np.array(bias).transpose(), color = "darkblue", linewidth=2)
-    axs[1].set_xlabel('Time [Age]', fontsize=16, fontweight = 'bold')
+    axs[1].plot(predicted_yield_class_sparse['age'], np.array(bias).transpose()[:,0], color = "darkblue", linewidth=2, label="Error")
+    axs[1].set_xlabel('Stand Age [years]', fontsize=16, fontweight = 'bold')
     axs[1].set_ylabel('Absolute error', fontsize=16, fontweight = 'bold')
     axs[1].tick_params(axis='x', labelrotation=45, labelsize=16)
     axs[1].tick_params(axis='y', labelsize=16)
-    axs[1].grid(False)
+    axs[1].legend(fontsize=14, title_fontproperties=bold_font,loc = "upper left")
 
     fig.align_ylabels(axs)
 
@@ -419,7 +421,7 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
     for i in range(5):
         subset = horizons_assembled[horizons_assembled['species_fullname'] == unique_species[i]]
         plt.fill_between(
-            subset['age'],
+            subset['age']-40,
             subset['h_means'] - 2*subset['h_sd'],
             subset['h_means'] + 2*subset['h_sd'],
             alpha=0.1,
@@ -429,13 +431,13 @@ def create_horizons_assembled_plot(horizons_assembled, output_file):
     # Plot the mean lines for each species
     for i in range(5):
         species_data = horizons_assembled[horizons_assembled['species_fullname'] == unique_species[i]]
-        plt.plot(species_data['age'], species_data['h_means'], label=unique_species[i], color=colors[i], linewidth=2)
+        plt.plot(species_data['age']-40, species_data['h_means'], label=unique_species[i], color=colors[i], linewidth=2)
 
     # Add horizontal dashed line at y = 0
     plt.axhline(y=0, color='black', linewidth=2, linestyle='--')
 
     # Set labels
-    plt.xlabel("Lead time [age]", fontsize=18, fontweight = 'bold')
+    plt.xlabel("Lead time [years]", fontsize=18, fontweight = 'bold')
     plt.ylabel("$\mathbf{\\varrho}-$AE [m]", fontsize=18, fontweight = 'bold')
 
     bold_font = font_manager.FontProperties(weight='bold', size=16)
@@ -497,9 +499,9 @@ def plot_age_limit_by_species_mulitples(result_dfs, thresholds, output_file):
     #ax.set_yticklabels([f'{int(yt)}' for yt in new_y_ticks])
 
     ax.set_xlabel('$\mathbf{\\varrho}$ [m]', fontsize=18, fontweight = 'bold')
-    ax.set_ylabel('Forecast horizon [years]', fontsize=18, fontweight = 'bold')
+    ax.set_ylabel('Forecast limit [years]', fontsize=18, fontweight = 'bold')
     ax.tick_params(axis='both', labelsize=18)
-    ax.legend()
+    #ax.legend()
 
     plt.tight_layout()
     plt.savefig(output_file, format='pdf')

@@ -3,7 +3,6 @@ import scipy.special as special
 import math
 from scipy.stats import pearsonr, norm, entropy, ttest_ind, f, bartlett
 import sklearn.metrics
-import CRPS.CRPS as pscore
 
 def absolute_differences(reference, ensemble, mean = False):
     absolute_differences = abs(np.subtract(reference, ensemble))
