@@ -32,7 +32,7 @@ if VARIABLE == 'st':
     VAR_ID = 3
     TARG_VARS = [ "stl1", "stl2", "stl3"]
     CONFIG = load_config(config_path = 'configs/mlp_emulator_node_st.yaml')
-    station_ids = ['Condom' ] #, 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
+    STATION_ID = ['Condom' ] #, 'Villevielle', 'LaGrandCombe', 'Narbonne', 'Urgons',
              #  'CabrieresdAvignon', 'Savenes', 'PeyrusseGrande','Sabres', 
              #   'Mouthoumet','Mejannes-le-Clap',  'CreondArmagnac', 'SaintFelixdeLauragais',
              #  'Mazan-Abbaye', 'LezignanCorbieres']
@@ -41,13 +41,13 @@ else:
     VAR_ID = 0
     TARG_VARS = [ "swvl1", "swvl2", "swvl3"]
     CONFIG = load_config(config_path = 'configs/mlp_emulator_node_sm.yaml')
-    station_ids = [ 'Condom'] # 'Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
+    STATION_ID = [ 'Condom'] # 'Savenes', 'Mouthoumet', 'Mazan-Abbaye', 'LezignanCorbieres', 
                      #   'LaGrandCombe', 'CreondArmagnac', 'Urgons',
     HORIZON = 52*4 # two weeks horizon
      
 TARG_LST = [ "swvl1", "swvl2", "swvl3", "stl1", "stl2", "stl3", "snowc"]
 MC_SAMPLES = 1000
-INITIAL_TIMES = 150
+INITIAL_TIMES = 250
 
 HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
 
@@ -69,9 +69,21 @@ def run_analysis(station_id, Station, time_step):
     initial_vector =  ForecastModel.transform_station_data(station_data = y_prog_initial_state, 
                                                         target_variable_list = TARG_LST)
 
-    dynamic_features, dynamic_features_prediction = ForecastModel.run_forecast(initial_conditions=initial_vector,
+    try:
+        dynamic_features, dynamic_features_prediction = ForecastModel.run_forecast(initial_conditions=initial_vector,
                                                                             mc_samples=MC_SAMPLES,
                                                                             predictions_perturbation = True)
+    except RuntimeError as e:
+
+        if "normal expects all elements of std >= 0.0" in str(e):
+            print("Error in deep_function: std contains negative values. Returning NaN vector.")
+            crps_dummy = np.empty((HORIZON,3))
+            crps_dummy[:]  = np.nan
+
+            return crps_dummy  # Return NaN matrix
+        else:
+            raise 
+
     dynamic_features = ForecastModel.backtransformation(dynamic_features)
     dynamic_features_prediction = [ForecastModel.backtransformation(dynamic_features_prediction[i]) for i in range(dynamic_features_prediction.shape[0])]
     dynamic_features_prediction = torch.stack(dynamic_features_prediction, dim=0)
@@ -134,7 +146,7 @@ def run_analysis(station_id, Station, time_step):
 start = time.time()
 
 Station = ObservationModule(network = 'soil_SMOSMANIA_ISMN_2022.nc', 
-                                    station = station_ids ,
+                                    station = STATION_ID ,
                                     variable = VARIABLE,
                                     depth=[0.05, 0.2, 0.3],
                                     years = [2021, 2022]) # Initialise the Observation Module with the default Station (Gevenich)
@@ -168,7 +180,7 @@ xr_data = xr.DataArray(
     name="forecast_horizons"
 )
 
-xr_data.to_netcdf(f"ecland-emulator/results/forecast_horizons_{VARIABLE}.nc")
+xr_data.to_netcdf(f"ecland-emulator/results/forecast_horizons_{VARIABLE}_{STATION_ID}.nc")
 
 print("--- %s seconds ---" % (time.time() - start))
 

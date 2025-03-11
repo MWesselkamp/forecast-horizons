@@ -22,7 +22,6 @@ from modules.observation_module import *
 from misc.helpers import *
 from tests.test_model import *
 
-set_global_seed(42)
 
 SCRIPT_DIR = os.getcwd()
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -49,7 +48,7 @@ else:
 
 INITIAL_TIME = '2022-02-01T00:00:00'
 TARG_LST = [ "swvl1", "swvl2", "swvl3", "stl1", "stl2", "stl3", "snowc"]
-MC_SAMPLES = 1000
+MC_SAMPLES = 5000
 HPARS = load_hpars(use_model = 'ecland-emulator/mlp')
 
 def run_analysis(station_id, Station):
