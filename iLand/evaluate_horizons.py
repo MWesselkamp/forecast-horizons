@@ -2,10 +2,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from iLand.data import *
-from iLand.evaluation_module import *
-from iLand.visualisations import *
-from iLand.helpers import *
+from data import *
+from evaluation_module import *
+from visualisations import *
+from helpers import *
 
 dm = DataSets()
 measurements, predictions_h100, predictions, measurements_subset = dm.get_data(baumarten_num = [1, 2, 3, 4, 5, 7])

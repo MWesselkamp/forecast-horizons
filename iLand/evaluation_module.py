@@ -1,5 +1,5 @@
 import numpy as np
-from iLand.data import *
+from data import *
 class EvaluationModule:
     def __init__(self, species_data):
 
