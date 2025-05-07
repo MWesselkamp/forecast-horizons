@@ -28,7 +28,7 @@ def main(species, plot_idx, standard):
     return EM.get_aggregated_results()
 
 species_names = predictions.species.unique()[:5] # ignore pisy
-standard = 2
+standard = 1
 horizons_assemble_df = pd.DataFrame()
 
 for species in species_names:
